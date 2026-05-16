@@ -1,0 +1,8 @@
+{
+  "name": "viral-consonance",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/consonance.test.js"
+  }
+}
