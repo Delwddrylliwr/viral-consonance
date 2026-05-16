@@ -21,6 +21,27 @@ const KEY_MAP = {
 window.addEventListener('keydown', e => { if (KEY_MAP[e.code]) { input[KEY_MAP[e.code]] = true;  e.preventDefault(); } });
 window.addEventListener('keyup',   e => { if (KEY_MAP[e.code]) { input[KEY_MAP[e.code]] = false; } });
 
+// Touch input: direction is computed from the touch position relative to canvas centre
+function handleTouch(e) {
+  e.preventDefault();
+  if (e.touches.length === 0) {
+    input.up = input.down = input.left = input.right = false;
+    return;
+  }
+  const t    = e.touches[0];
+  const dx   = t.clientX - canvas.width  / 2;
+  const dy   = t.clientY - canvas.height / 2;
+  const dead = 20; // px deadzone — no movement when touching near centre
+  input.right = dx >  dead;
+  input.left  = dx < -dead;
+  input.down  = dy >  dead;
+  input.up    = dy < -dead;
+}
+canvas.addEventListener('touchstart',  handleTouch, { passive: false });
+canvas.addEventListener('touchmove',   handleTouch, { passive: false });
+canvas.addEventListener('touchend',    handleTouch, { passive: false });
+canvas.addEventListener('touchcancel', handleTouch, { passive: false });
+
 let player, cell, playerVoice, cellVoice;
 let infectionFlash = 0; // alpha countdown for screen flash
 
@@ -49,8 +70,8 @@ function init() {
   });
 }
 
-// Click-to-start overlay (required for Web Audio context)
-document.getElementById('start').addEventListener('click', async () => {
+// Click/tap-to-start overlay (required for Web Audio context)
+document.getElementById('start').addEventListener('pointerdown', async () => {
   await Tone.start();
   startTransport(100);
   init();
