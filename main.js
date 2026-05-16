@@ -7,7 +7,7 @@ import { roughness, DEFAULT_TIMBRE } from './src/audio/consonance.js';
 import { Player, Cell } from './src/game/entities.js';
 import { checkContact, bouncePlayer, spawnCell, INFECTION_THRESHOLD }
   from './src/game/contact.js';
-import { resolutionCadence, dissonantStab } from './src/audio/synthesis.js';
+import { resolutionCadence, dissonantStab, naturalDeathTone } from './src/audio/synthesis.js';
 
 const canvas = initCanvas();
 const ctx    = canvas.getContext('2d');
@@ -67,6 +67,21 @@ function init() {
     state.playerNote = pNote;
     state.cellNote   = cNote;
     state.voiceCount = voiceCount();
+
+    // Natural lifetime: decrement and expire
+    if (cell.active) {
+      cell.beatsLeft--;
+      if (cell.beatsLeft <= 0) {
+        cell.active     = false;
+        cell.dyingTimer = 0.8;
+        naturalDeathTone();
+        setTimeout(() => {
+          cell = spawnCell(player.x, player.y);
+        }, 900);
+      }
+    }
+
+    state.beatsLeft = cell.beatsLeft;
   });
 }
 

@@ -7,6 +7,7 @@ export function drawDebug(ctx, state) {
     `ROUGHNESS: ${state.roughness.toFixed(3)}`,
     `PLAYER:   ${hzToName(state.playerNote)}`,
     `CELL:     ${hzToName(state.cellNote)}`,
+    `BEATS:    ${state.beatsLeft}`,
   ];
 
   ctx.save();

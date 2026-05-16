@@ -50,9 +50,16 @@ export function drawPlayer(ctx, player, activeFreq) {
 }
 
 export function drawCell(ctx, cell) {
-  const alpha = cell.flashTimer > 0
-    ? 0.5 + 0.5 * (cell.flashTimer / 0.5)
-    : 0.6;
+  let alpha;
+  if (cell.dyingTimer > 0) {
+    alpha = (cell.dyingTimer / 0.8) * 0.6;            // fade to nothing on natural death
+  } else if (cell.flashTimer > 0) {
+    alpha = 0.5 + 0.5 * (cell.flashTimer / 0.5);      // bright flash on infection
+  } else if (cell.beatsLeft <= 4 && cell.beatsTotal > 0) {
+    alpha = 0.25 + 0.35 * (cell.beatsLeft / 4);       // dim warning in last 4 beats
+  } else {
+    alpha = 0.6;
+  }
   const color = cell.flashTimer > 0 ? '#fff' : cell.color;
 
   drawCircle(ctx, cell.x, cell.y, cell.radius, color, alpha);

@@ -67,6 +67,24 @@ export function resolutionCadence() {
   }, 3500);
 }
 
+// Descending glide played when a cell expires naturally — quiet, deflating
+export function naturalDeathTone() {
+  const synth = new Tone.Synth({
+    oscillator: { type: 'sine' },
+    envelope: { attack: 0.05, decay: 0.0, sustain: 1.0, release: 0.5 },
+  }).toDestination();
+  synth.volume.value = -22;
+  _voiceCount++;
+  const now = Tone.now();
+  synth.triggerAttack('C4', now);
+  synth.frequency.rampTo('G3', 0.5, now);
+  synth.triggerRelease(now + 0.5);
+  setTimeout(() => {
+    _voiceCount = Math.max(0, _voiceCount - 1);
+    synth.dispose();
+  }, 2000);
+}
+
 // Short dissonant minor-second stab
 export function dissonantStab() {
   const poly = new Tone.PolySynth(Tone.Synth, {

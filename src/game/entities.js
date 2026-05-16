@@ -2,10 +2,10 @@ import { PLAYER_CHORD, MOTIF_EASY, MOTIF_MEDIUM, MOTIF_HARD, MOTIF_RESISTANT }
   from '../audio/scale.js';
 
 const CELL_STYLES = {
-  easy:      { color: '#4e8', motif: MOTIF_EASY },
-  medium:    { color: '#ca4', motif: MOTIF_MEDIUM },
-  hard:      { color: '#f84', motif: MOTIF_HARD },
-  resistant: { color: '#e45', motif: MOTIF_RESISTANT },
+  easy:      { color: '#4e8', motif: MOTIF_EASY,      beats: 24 },
+  medium:    { color: '#ca4', motif: MOTIF_MEDIUM,    beats: 20 },
+  hard:      { color: '#f84', motif: MOTIF_HARD,      beats: 16 },
+  resistant: { color: '#e45', motif: MOTIF_RESISTANT, beats:  8 },
 };
 
 function angleDiff(a, b) {
@@ -70,12 +70,16 @@ export class Cell {
     // 1 full rotation per 4 beats = 2.4 s at 100 BPM
     this.rotationSpeed = (2 * Math.PI) / 2.4;
     this.flashTimer = 0;
+    this.dyingTimer = 0;   // counts down after natural death for the fade-out anim
+    this.beatsLeft  = CELL_STYLES[type].beats;
+    this.beatsTotal = CELL_STYLES[type].beats;
     this.active = true;
   }
 
   update(dt) {
     this.rotation += this.rotationSpeed * dt;
     if (this.flashTimer > 0) this.flashTimer = Math.max(0, this.flashTimer - dt);
+    if (this.dyingTimer > 0) this.dyingTimer = Math.max(0, this.dyingTimer - dt);
   }
 
   getDots() {
