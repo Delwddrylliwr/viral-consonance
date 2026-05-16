@@ -1,6 +1,9 @@
 import { initCanvas, clear, drawPlayer, drawCell, drawGlow } from './src/render/canvas.js';
+import { drawDebug } from './src/render/debug.js';
 import { DEBUG, state } from './src/game/state.js';
 import { startTransport, onBeat, getBPM } from './src/audio/transport.js';
+import { createPlayerVoice, createCellVoice, voiceCount } from './src/audio/synthesis.js';
+import { roughness, DEFAULT_TIMBRE } from './src/audio/consonance.js';
 import { Player, Cell } from './src/game/entities.js';
 
 const canvas = initCanvas();
@@ -15,20 +18,37 @@ const KEY_MAP = {
 window.addEventListener('keydown', e => { if (KEY_MAP[e.code]) { input[KEY_MAP[e.code]] = true;  e.preventDefault(); } });
 window.addEventListener('keyup',   e => { if (KEY_MAP[e.code]) { input[KEY_MAP[e.code]] = false; } });
 
-let player, cell;
+let player, cell, playerVoice, cellVoice;
 
 function init() {
   const cx = canvas.width  / 2;
   const cy = canvas.height / 2;
   player = new Player(cx, cy);
   cell   = new Cell(cx + 220, cy - 60);
+
+  playerVoice = createPlayerVoice();
+  cellVoice   = createCellVoice();
+
+  onBeat(() => {
+    state.tempo = getBPM();
+
+    const pNote = player.getActiveNote(cell.x, cell.y);
+    const cNote = cell.getActiveNote(player.x, player.y);
+
+    cellVoice.trigger(cNote);
+    playerVoice.setFreq(pNote);
+
+    state.roughness  = roughness([pNote], [cNote], DEFAULT_TIMBRE);
+    state.playerNote = pNote;
+    state.cellNote   = cNote;
+    state.voiceCount = voiceCount();
+  });
 }
 
 // Click-to-start overlay (required for Web Audio context)
 document.getElementById('start').addEventListener('click', async () => {
   await Tone.start();
   startTransport(100);
-  onBeat(() => { state.tempo = getBPM(); });
   init();
   document.getElementById('start').remove();
   requestAnimationFrame(loop);
@@ -50,8 +70,7 @@ function loop(ts) {
   drawCell(ctx, cell);
   drawPlayer(ctx, player, activePlayerNote);
 
-  state.playerNote = activePlayerNote;
-  state.cellNote   = activeCellNote;
+  if (DEBUG) drawDebug(ctx, state);
 
   requestAnimationFrame(loop);
 }
