@@ -5,6 +5,9 @@ import { startTransport, onBeat, getBPM } from './src/audio/transport.js';
 import { createPlayerVoice, createCellVoice, voiceCount } from './src/audio/synthesis.js';
 import { roughness, DEFAULT_TIMBRE } from './src/audio/consonance.js';
 import { Player, Cell } from './src/game/entities.js';
+import { checkContact, bouncePlayer, spawnCell, INFECTION_THRESHOLD }
+  from './src/game/contact.js';
+import { resolutionCadence, dissonantStab } from './src/audio/synthesis.js';
 
 const canvas = initCanvas();
 const ctx    = canvas.getContext('2d');
@@ -62,8 +65,29 @@ function loop(ts) {
   player.update(dt, input, canvas.width, canvas.height);
   cell.update(dt);
 
+  // Contact resolution (guard against re-triggering while cell is flashing)
+  if (cell.active && checkContact(player, cell)) {
+    const r = roughness(
+      [player.getActiveNote(cell.x, cell.y)],
+      [cell.getActiveNote(player.x, player.y)],
+      DEFAULT_TIMBRE,
+    );
+    if (r < INFECTION_THRESHOLD) {
+      // Infection
+      cell.active     = false;
+      cell.flashTimer = 0.5;
+      resolutionCadence();
+      setTimeout(() => {
+        cell = spawnCell(canvas.width, canvas.height, player.x, player.y);
+      }, 650);
+    } else {
+      // Bounce
+      bouncePlayer(player, cell);
+      dissonantStab();
+    }
+  }
+
   const activePlayerNote = player.getActiveNote(cell.x, cell.y);
-  const activeCellNote   = cell.getActiveNote(player.x, player.y);
 
   clear(ctx);
   drawGlow(ctx, player, cell, state.roughness);
