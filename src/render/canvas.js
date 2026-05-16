@@ -69,34 +69,52 @@ export function drawCell(ctx, cell) {
 }
 
 export function drawGlow(ctx, player, cell, roughness) {
-  const consonance = Math.max(0, (0.3 - roughness) / 0.3);
-  if (consonance <= 0) return;
+  // Show glow for any rough value below 0.6; green = consonant, amber = dissonant-but-close
+  const proximity = Math.max(0, (0.6 - roughness) / 0.6);
+  if (proximity <= 0) return;
 
-  // Direction from player to cell
   const dx = cell.x - player.x;
   const dy = cell.y - player.y;
   const dist = Math.hypot(dx, dy);
   if (dist === 0) return;
-  const nx = dx / dist, ny = dy / dist;
 
-  // Line from player edge to cell edge
+  // Only draw if the circles are reasonably close
+  const gap = dist - player.radius - cell.radius;
+  if (gap > 250) return;
+
+  const nx = dx / dist, ny = dy / dist;
   const x1 = player.x + nx * player.radius;
   const y1 = player.y + ny * player.radius;
   const x2 = cell.x   - nx * cell.radius;
   const y2 = cell.y   - ny * cell.radius;
 
+  // Colour shifts green as roughness drops below threshold
+  const consonance = Math.max(0, (0.3 - roughness) / 0.3);
+  const r = Math.round(100 + (1 - consonance) * 155);
+  const g = Math.round(80  + consonance       * 175);
+  const b = Math.round(50  + consonance       * 100);
+
   const grad = ctx.createLinearGradient(x1, y1, x2, y2);
-  grad.addColorStop(0,   `rgba(100, 220, 255, ${consonance * 0.8})`);
-  grad.addColorStop(0.5, `rgba(180, 255, 200, ${consonance})`);
-  grad.addColorStop(1,   `rgba(255, 200, 100, ${consonance * 0.8})`);
+  grad.addColorStop(0,   `rgba(${r},${g},${b}, ${proximity * 0.6})`);
+  grad.addColorStop(0.5, `rgba(${r},${g},${b}, ${proximity})`);
+  grad.addColorStop(1,   `rgba(${r},${g},${b}, ${proximity * 0.6})`);
 
   ctx.save();
   ctx.strokeStyle = grad;
-  ctx.lineWidth = 2 + consonance * 4;
-  ctx.globalAlpha = consonance * 0.7;
+  ctx.lineWidth   = 1.5 + consonance * 5;
   ctx.beginPath();
   ctx.moveTo(x1, y1);
   ctx.lineTo(x2, y2);
   ctx.stroke();
+  ctx.restore();
+}
+
+// Brief full-screen flash on infection
+export function drawInfectionFlash(ctx, alpha) {
+  if (alpha <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = alpha * 0.25;
+  ctx.fillStyle   = '#aaffcc';
+  ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   ctx.restore();
 }

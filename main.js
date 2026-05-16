@@ -1,4 +1,4 @@
-import { initCanvas, clear, drawPlayer, drawCell, drawGlow } from './src/render/canvas.js';
+import { initCanvas, clear, drawPlayer, drawCell, drawGlow, drawInfectionFlash } from './src/render/canvas.js';
 import { drawDebug } from './src/render/debug.js';
 import { DEBUG, state } from './src/game/state.js';
 import { startTransport, onBeat, getBPM } from './src/audio/transport.js';
@@ -22,6 +22,7 @@ window.addEventListener('keydown', e => { if (KEY_MAP[e.code]) { input[KEY_MAP[e
 window.addEventListener('keyup',   e => { if (KEY_MAP[e.code]) { input[KEY_MAP[e.code]] = false; } });
 
 let player, cell, playerVoice, cellVoice;
+let infectionFlash = 0; // alpha countdown for screen flash
 
 function init() {
   const cx = canvas.width  / 2;
@@ -76,6 +77,7 @@ function loop(ts) {
       // Infection
       cell.active     = false;
       cell.flashTimer = 0.5;
+      infectionFlash  = 1;
       resolutionCadence();
       setTimeout(() => {
         cell = spawnCell(canvas.width, canvas.height, player.x, player.y);
@@ -89,10 +91,13 @@ function loop(ts) {
 
   const activePlayerNote = player.getActiveNote(cell.x, cell.y);
 
+  infectionFlash = Math.max(0, infectionFlash - dt * 2.5);
+
   clear(ctx);
   drawGlow(ctx, player, cell, state.roughness);
   drawCell(ctx, cell);
   drawPlayer(ctx, player, activePlayerNote);
+  drawInfectionFlash(ctx, infectionFlash);
 
   if (DEBUG) drawDebug(ctx, state);
 
