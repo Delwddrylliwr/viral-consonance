@@ -49,7 +49,7 @@ function init() {
   const cx = canvas.width  / 2;
   const cy = canvas.height / 2;
   player = new Player(cx, cy);
-  cell   = new Cell(cx + 220, cy - 60);
+  cell   = new Cell(cx + 220, cy - 60, 'easy');
 
   playerVoice = createPlayerVoice();
   cellVoice   = createCellVoice();

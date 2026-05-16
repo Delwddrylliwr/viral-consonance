@@ -17,12 +17,15 @@ export function bouncePlayer(player, cell) {
   player.y += (dy / dist) * push;
 }
 
-// Spawn a new cell at a random distance/angle from the player in world space
+// Spawn a new cell at a random distance/angle from the player in world space.
+// Type alternates randomly: 50 % easy, 50 % hard.
 export function spawnCell(playerX, playerY, minDist = 200, maxDist = 380) {
   const angle = Math.random() * Math.PI * 2;
   const dist  = minDist + Math.random() * (maxDist - minDist);
+  const type  = Math.random() < 0.5 ? 'easy' : 'hard';
   return new Cell(
     playerX + Math.cos(angle) * dist,
     playerY + Math.sin(angle) * dist,
+    type,
   );
 }

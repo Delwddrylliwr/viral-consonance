@@ -1,4 +1,9 @@
-import { PLAYER_CHORD, CELL_MOTIF } from '../audio/scale.js';
+import { PLAYER_CHORD, CELL_MOTIF, HARD_CELL_MOTIF } from '../audio/scale.js';
+
+const CELL_STYLES = {
+  easy: { color: '#f84', motif: CELL_MOTIF },
+  hard: { color: '#e45', motif: HARD_CELL_MOTIF },
+};
 
 function angleDiff(a, b) {
   let d = ((a - b) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI;
@@ -51,11 +56,13 @@ export class Player {
 }
 
 export class Cell {
-  constructor(x, y) {
+  constructor(x, y, type = 'easy') {
     this.x = x;
     this.y = y;
     this.radius = 45;
-    this.motif  = CELL_MOTIF;   // [C4, E4, G4, C5]
+    this.type   = type;
+    this.motif  = CELL_STYLES[type].motif;
+    this.color  = CELL_STYLES[type].color;
     this.rotation      = 0;
     // 1 full rotation per 4 beats = 2.4 s at 100 BPM
     this.rotationSpeed = (2 * Math.PI) / 2.4;
