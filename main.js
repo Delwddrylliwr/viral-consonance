@@ -70,14 +70,26 @@ function init() {
   });
 }
 
-// Click/tap-to-start overlay (required for Web Audio context)
-document.getElementById('start').addEventListener('pointerdown', async () => {
-  await Tone.start();
-  startTransport(100);
-  init();
-  document.getElementById('start').remove();
-  requestAnimationFrame(loop);
-}, { once: true });
+// Click/tap-to-start overlay (required for Web Audio context).
+// 'click' is used because mobile browsers reliably synthesise it from touch;
+// pointerdown can fire before the gesture is confirmed as intentional.
+async function startGame() {
+  const startEl = document.getElementById('start');
+  const label   = startEl.querySelector('span');
+  try {
+    label.textContent = 'starting…';
+    await Tone.start();
+    startTransport(100);
+    init();
+    startEl.remove();
+    requestAnimationFrame(loop);
+  } catch (err) {
+    // Show the error visibly on screen so it can be read on a touch device
+    label.textContent = 'Error: ' + (err && err.message ? err.message : String(err));
+    console.error(err);
+  }
+}
+document.getElementById('start').addEventListener('click', startGame, { once: true });
 
 let last = 0;
 function loop(ts) {

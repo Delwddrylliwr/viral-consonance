@@ -1,21 +1,12 @@
 let _voiceCount = 0;
 export const voiceCount = () => _voiceCount;
 
-// Shared reverb for warmth — created lazily on first use
-let _reverb = null;
-function getReverb() {
-  if (!_reverb) {
-    _reverb = new Tone.Reverb({ decay: 1.8, wet: 0.25 }).toDestination();
-  }
-  return _reverb;
-}
-
 // Sustained tone for the player's active note
 export function createPlayerVoice() {
   const synth = new Tone.Synth({
     oscillator: { type: 'triangle' },
     envelope: { attack: 0.08, decay: 0.1, sustain: 0.7, release: 0.6 },
-  }).connect(getReverb());
+  }).toDestination();
   synth.volume.value = -18;
 
   let started = false;
@@ -62,8 +53,8 @@ export function resolutionCadence() {
   const poly = new Tone.PolySynth(Tone.Synth, {
     oscillator: { type: 'triangle' },
     envelope: { attack: 0.02, decay: 0.4, sustain: 0.55, release: 1.2 },
-  }).connect(getReverb());
-  poly.volume.value = -8;
+  }).toDestination();
+  poly.volume.value = -10;
 
   const now = Tone.now();
   // G dominant 7th → C major (strong resolution feel)
