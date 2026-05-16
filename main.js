@@ -84,7 +84,7 @@ function loop(ts) {
   const dt = Math.min((ts - last) / 1000, 0.05);
   last = ts;
 
-  player.update(dt, input, canvas.width, canvas.height);
+  player.update(dt, input);
   cell.update(dt);
 
   // Contact resolution (guard against re-triggering while cell is flashing)
@@ -101,7 +101,7 @@ function loop(ts) {
       infectionFlash  = 1;
       resolutionCadence();
       setTimeout(() => {
-        cell = spawnCell(canvas.width, canvas.height, player.x, player.y);
+        cell = spawnCell(player.x, player.y);
       }, 650);
     } else {
       // Bounce
@@ -115,11 +115,20 @@ function loop(ts) {
   infectionFlash = Math.max(0, infectionFlash - dt * 2.5);
 
   clear(ctx);
+
+  // Camera: keep player centred, move world around them
+  ctx.save();
+  ctx.translate(
+    canvas.width  / 2 - player.x,
+    canvas.height / 2 - player.y,
+  );
   drawGlow(ctx, player, cell, state.roughness);
   drawCell(ctx, cell);
   drawPlayer(ctx, player, activePlayerNote);
-  drawInfectionFlash(ctx, infectionFlash);
+  ctx.restore();
 
+  // Screen-space overlays (not affected by camera)
+  drawInfectionFlash(ctx, infectionFlash);
   if (DEBUG) drawDebug(ctx, state);
 
   requestAnimationFrame(loop);

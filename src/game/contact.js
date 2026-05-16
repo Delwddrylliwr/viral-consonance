@@ -17,13 +17,12 @@ export function bouncePlayer(player, cell) {
   player.y += (dy / dist) * push;
 }
 
-// Spawn a new cell at a random position at least minDist px from the player
-export function spawnCell(canvasW, canvasH, playerX, playerY, minDist = 200) {
-  const margin = 80;
-  let x, y;
-  do {
-    x = margin + Math.random() * (canvasW - margin * 2);
-    y = margin + Math.random() * (canvasH - margin * 2);
-  } while (Math.hypot(x - playerX, y - playerY) < minDist);
-  return new Cell(x, y);
+// Spawn a new cell at a random distance/angle from the player in world space
+export function spawnCell(playerX, playerY, minDist = 200, maxDist = 380) {
+  const angle = Math.random() * Math.PI * 2;
+  const dist  = minDist + Math.random() * (maxDist - minDist);
+  return new Cell(
+    playerX + Math.cos(angle) * dist,
+    playerY + Math.sin(angle) * dist,
+  );
 }

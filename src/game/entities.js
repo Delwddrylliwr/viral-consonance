@@ -16,16 +16,13 @@ export class Player {
     this.rotationSpeed = Math.PI / 4; // 1 rev per 8 s
   }
 
-  update(dt, input, canvasW, canvasH) {
+  update(dt, input) {
     let dx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
     let dy = (input.down  ? 1 : 0) - (input.up   ? 1 : 0);
     const len = Math.hypot(dx, dy);
     if (len > 0) { dx /= len; dy /= len; }
     this.x += dx * this.speed * dt;
     this.y += dy * this.speed * dt;
-    // Clamp to canvas bounds
-    this.x = Math.max(this.radius, Math.min(canvasW - this.radius, this.x));
-    this.y = Math.max(this.radius, Math.min(canvasH - this.radius, this.y));
     this.rotation += this.rotationSpeed * dt;
   }
 
