@@ -116,17 +116,15 @@ function loop(ts) {
 
   // Contact resolution (guard against re-triggering while cell is flashing)
   if (cell.active && checkContact(player, cell)) {
-    const r = roughness(
-      [player.getActiveNote(cell.x, cell.y)],
-      [cell.getActiveNote(player.x, player.y)],
-      DEFAULT_TIMBRE,
-    );
+    const pNote = player.getActiveNote(cell.x, cell.y);
+    const cNote = cell.getActiveNote(player.x, player.y);
+    const r = roughness([pNote], [cNote], DEFAULT_TIMBRE);
     if (r < INFECTION_THRESHOLD) {
       // Infection
       cell.active     = false;
       cell.flashTimer = 0.5;
       infectionFlash  = 1;
-      resolutionCadence();
+      resolutionCadence(pNote, cNote);
       setTimeout(() => {
         cell = spawnCell(player.x, player.y);
       }, 650);
