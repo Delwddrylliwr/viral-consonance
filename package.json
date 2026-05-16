@@ -4,5 +4,8 @@
   "type": "module",
   "scripts": {
     "test": "node --test tests/consonance.test.js"
+  },
+  "dependencies": {
+    "tone": "^15.1.22"
   }
 }
