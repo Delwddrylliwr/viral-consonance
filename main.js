@@ -131,8 +131,8 @@ function loop(ts) {
         cell = spawnCell(player.x, player.y);
       }, 650);
     } else {
-      // Bounce
-      bouncePlayer(player, cell);
+      // Bounce — knockback scales with roughness
+      bouncePlayer(player, cell, r);
       dissonantStab();
     }
   }

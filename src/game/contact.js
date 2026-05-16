@@ -7,12 +7,13 @@ export function checkContact(player, cell) {
   return dist < player.radius + cell.radius;
 }
 
-// Push player cleanly outside the cell's boundary
-export function bouncePlayer(player, cell) {
+// Push player away from the cell. Base separation keeps circles apart;
+// extra knockback is proportional to roughness (0 → 0 px, 1.0 → 200 px).
+export function bouncePlayer(player, cell, roughness = 0) {
   const dx    = player.x - cell.x;
   const dy    = player.y - cell.y;
   const dist  = Math.hypot(dx, dy) || 1;
-  const push  = player.radius + cell.radius - dist + 4;
+  const push  = (player.radius + cell.radius - dist + 4) + roughness * 200;
   player.x += (dx / dist) * push;
   player.y += (dy / dist) * push;
 }
