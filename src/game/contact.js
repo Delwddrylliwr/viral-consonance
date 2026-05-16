@@ -17,15 +17,22 @@ export function bouncePlayer(player, cell) {
   player.y += (dy / dist) * push;
 }
 
-// Spawn a new cell at a random distance/angle from the player in world space.
-// Type alternates randomly: 50 % easy, 50 % hard.
+// Weighted random cell type. First cell is always 'easy' (see main.js).
+// Weights: easy 25 %, medium 35 %, hard 30 %, resistant 10 %.
+function randomType() {
+  const r = Math.random();
+  if (r < 0.25) return 'easy';
+  if (r < 0.60) return 'medium';
+  if (r < 0.90) return 'hard';
+  return 'resistant';
+}
+
 export function spawnCell(playerX, playerY, minDist = 200, maxDist = 380) {
   const angle = Math.random() * Math.PI * 2;
   const dist  = minDist + Math.random() * (maxDist - minDist);
-  const type  = Math.random() < 0.5 ? 'easy' : 'hard';
   return new Cell(
     playerX + Math.cos(angle) * dist,
     playerY + Math.sin(angle) * dist,
-    type,
+    randomType(),
   );
 }

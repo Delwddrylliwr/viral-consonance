@@ -1,8 +1,11 @@
-import { PLAYER_CHORD, CELL_MOTIF, HARD_CELL_MOTIF } from '../audio/scale.js';
+import { PLAYER_CHORD, MOTIF_EASY, MOTIF_MEDIUM, MOTIF_HARD, MOTIF_RESISTANT }
+  from '../audio/scale.js';
 
 const CELL_STYLES = {
-  easy: { color: '#f84', motif: CELL_MOTIF },
-  hard: { color: '#e45', motif: HARD_CELL_MOTIF },
+  easy:      { color: '#4e8', motif: MOTIF_EASY },
+  medium:    { color: '#ca4', motif: MOTIF_MEDIUM },
+  hard:      { color: '#f84', motif: MOTIF_HARD },
+  resistant: { color: '#e45', motif: MOTIF_RESISTANT },
 };
 
 function angleDiff(a, b) {
