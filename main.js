@@ -1,11 +1,15 @@
 import { initCanvas, clear, drawCircle } from './src/render/canvas.js';
 import { DEBUG, state } from './src/game/state.js';
+import { startTransport, onBeat, getBPM } from './src/audio/transport.js';
 
 const canvas = initCanvas();
 const ctx    = canvas.getContext('2d');
 
 // Click-to-start overlay (required for Web Audio context)
-document.getElementById('start').addEventListener('click', () => {
+document.getElementById('start').addEventListener('click', async () => {
+  await Tone.start();
+  startTransport(100);
+  onBeat(() => { state.tempo = getBPM(); });
   document.getElementById('start').remove();
   requestAnimationFrame(loop);
 }, { once: true });
