@@ -1,11 +1,17 @@
 let _voiceCount = 0;
 export const voiceCount = () => _voiceCount;
 
-// Shared reverb for warmth — created lazily on first use
+// Shared reverb for warmth — created lazily on first use.
+// Falls back to destination directly if OfflineAudioContext fails (e.g. some iOS/iframe envs).
 let _reverb = null;
 function getReverb() {
   if (!_reverb) {
-    _reverb = new Tone.Reverb({ decay: 1.8, wet: 0.25 }).toDestination();
+    try {
+      _reverb = new Tone.Reverb({ decay: 1.8, wet: 0.25 }).toDestination();
+    } catch (e) {
+      console.warn('Reverb unavailable, using dry signal:', e);
+      _reverb = Tone.getDestination();
+    }
   }
   return _reverb;
 }
