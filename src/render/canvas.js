@@ -121,6 +121,23 @@ export function drawProtein(ctx, protein) {
   ctx.restore();
 }
 
+export function drawClone(ctx, clone) {
+  ctx.save();
+  ctx.globalAlpha = clone.alpha * 0.6;
+  ctx.strokeStyle = '#8af';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(clone.x, clone.y, clone.radius, 0, Math.PI * 2);
+  ctx.stroke();
+  const dx = Math.cos(clone.angle) * clone.radius;
+  const dy = Math.sin(clone.angle) * clone.radius;
+  ctx.fillStyle = '#adf';
+  ctx.beginPath();
+  ctx.arc(clone.x + dx, clone.y + dy, 3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 // Brief full-screen flash on infection
 export function drawInfectionFlash(ctx, alpha) {
   if (alpha <= 0) return;

@@ -119,6 +119,23 @@ export function deathSequence(onComplete) {
   setTimeout(onComplete, 4000);
 }
 
+// Ambient arpeggio voice for nearby clones (max 2 simultaneous via PolySynth)
+export function createCloneVoice() {
+  const synth = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: 'sine' },
+    envelope: { attack: 0.02, decay: 0.3, sustain: 0.0, release: 0.08 },
+  }).toDestination();
+  synth.volume.value = -22;
+
+  return {
+    trigger(hz) {
+      _voiceCount++;
+      synth.triggerAttackRelease(hz, '8n');
+      setTimeout(() => { _voiceCount = Math.max(0, _voiceCount - 1); }, 500);
+    },
+  };
+}
+
 // Short dissonant minor-second stab
 export function dissonantStab() {
   const poly = new Tone.PolySynth(Tone.Synth, {

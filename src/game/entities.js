@@ -207,3 +207,46 @@ export class ComplementProtein {
     this.dy = (dy / d) * spd;
   }
 }
+
+const CLONE_LIFETIME_S = 20;
+
+export class Clone {
+  constructor(x, y, chord) {
+    this.x = x; this.y = y;
+    this.radius = 18;
+    this.chord = chord.slice();
+    this.detuning = (Math.random() - 0.5) * 0.02; // ±1% — quasi-species microtonality
+    this.lifetime = CLONE_LIFETIME_S;
+    this.angle = Math.random() * Math.PI * 2;
+    const speed = 30 + Math.random() * 20;
+    const dir = Math.random() * Math.PI * 2;
+    this.vx = Math.cos(dir) * speed;
+    this.vy = Math.sin(dir) * speed;
+    this.steerTimer = 3 + Math.random() * 3;
+  }
+
+  get alive() { return this.lifetime > 0; }
+
+  // Fades out in the last 5 s of life
+  get alpha() { return Math.min(1, this.lifetime / 5); }
+
+  update(dt) {
+    this.lifetime -= dt;
+    this.angle += 0.4 * dt;
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+    this.steerTimer -= dt;
+    if (this.steerTimer <= 0) {
+      const dir = Math.random() * Math.PI * 2;
+      const speed = 30 + Math.random() * 20;
+      this.vx = Math.cos(dir) * speed;
+      this.vy = Math.sin(dir) * speed;
+      this.steerTimer = 3 + Math.random() * 3;
+    }
+  }
+
+  activeNote() {
+    const idx = Math.floor(Date.now() / 500) % this.chord.length;
+    return this.chord[idx] * (1 + this.detuning);
+  }
+}
