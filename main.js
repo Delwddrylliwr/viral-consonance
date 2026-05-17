@@ -240,6 +240,13 @@ function loop(ts) {
     }
   }
 
+  // Cell leash: replace active cells that have drifted beyond 600 px from player
+  cells = cells.map(c => {
+    if (!c.active || Math.hypot(c.x - player.x, c.y - player.y) <= 600) return c;
+    return spawnCell(player.x, player.y); // fresh random-type cell near player
+  });
+  if (!committedCell || !committedCell.active) committedCell = nearestActiveCell();
+
   const activePlayerNote = committedCell
     ? player.getActiveNote(committedCell.x, committedCell.y)
     : player.getActiveNote(0, 0);
