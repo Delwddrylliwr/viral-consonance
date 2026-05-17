@@ -163,18 +163,26 @@ export class ComplementProtein {
       this.y = player.y + Math.sin(this.attachAngle) * this.attachDist;
       return;
     }
-    // Gentle random steering every few seconds
-    this.steerTimer -= dt;
-    if (this.steerTimer <= 0) {
-      this.steerTimer = 2 + Math.random() * 3;
-      const turn = (Math.random() - 0.5) * 1.2;
-      const c = Math.cos(turn), s = Math.sin(turn);
-      const nx = this.dx * c - this.dy * s;
-      const ny = this.dx * s + this.dy * c;
-      this.dx = nx; this.dy = ny;
+    const toX = player.x - this.x, toY = player.y - this.y;
+    const d   = Math.hypot(toX, toY) || 1;
+    if (d < 160) {
+      // Within proximity: home toward player at moderate speed
+      this.x += (toX / d) * 55 * dt;
+      this.y += (toY / d) * 55 * dt;
+    } else {
+      // Passive drift with gentle periodic steering
+      this.steerTimer -= dt;
+      if (this.steerTimer <= 0) {
+        this.steerTimer = 2 + Math.random() * 3;
+        const turn = (Math.random() - 0.5) * 1.2;
+        const c = Math.cos(turn), s = Math.sin(turn);
+        const nx = this.dx * c - this.dy * s;
+        const ny = this.dx * s + this.dy * c;
+        this.dx = nx; this.dy = ny;
+      }
+      this.x += this.dx * dt;
+      this.y += this.dy * dt;
     }
-    this.x += this.dx * dt;
-    this.y += this.dy * dt;
   }
 
   attach(player) {
@@ -191,7 +199,7 @@ export class ComplementProtein {
     // Flee immediately to prevent instant re-attachment
     const dx = this.x - player.x, dy = this.y - player.y;
     const d  = Math.hypot(dx, dy) || 1;
-    const fleeR = player.radius + this.radius + 50;
+    const fleeR = 220; // push past proximity-attraction radius (160 px)
     this.x = player.x + (dx / d) * fleeR;
     this.y = player.y + (dy / d) * fleeR;
     const spd = Math.hypot(this.dx, this.dy) || 25;

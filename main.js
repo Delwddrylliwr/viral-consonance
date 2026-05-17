@@ -53,6 +53,8 @@ let player, cells, committedCell, proteins, playerVoice, cellVoice;
 let infectionFlash = 0;
 let dead = false;
 let deathFade = 0;
+let gameTime = 0;   // seconds of live play
+let bpmAccum = 0;   // ∫ BPM dt — divide by gameTime for average
 
 // --- A+B helpers ---
 
@@ -94,6 +96,8 @@ function init() {
 
   dead      = false;
   deathFade = 0;
+  gameTime  = 0;
+  bpmAccum  = 0;
   state.dead = false;
 
   playerVoice = createPlayerVoice();
@@ -171,16 +175,24 @@ function loop(ts) {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.restore();
     if (deathFade >= 0.95) {
+      const avgBpm = gameTime > 0 ? Math.round(bpmAccum / gameTime) : 0;
       ctx.save();
-      ctx.font = '18px monospace';
-      ctx.fillStyle = '#444';
+      ctx.font = '26px monospace';
+      ctx.fillStyle = '#888';
       ctx.textAlign = 'center';
-      ctx.fillText('run ended — click to restart', canvas.width / 2, canvas.height / 2);
+      ctx.fillText(`avg BPM  ${avgBpm}`, canvas.width / 2, canvas.height / 2 - 18);
+      ctx.font = '15px monospace';
+      ctx.fillStyle = '#444';
+      ctx.fillText('click to restart', canvas.width / 2, canvas.height / 2 + 18);
       ctx.restore();
     }
     requestAnimationFrame(loop);
     return;
   }
+
+  // Accumulate BPM for final score
+  gameTime += dt;
+  bpmAccum += getBPM() * dt;
 
   // Update entities
   player.update(dt, input, now);
