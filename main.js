@@ -4,7 +4,7 @@ import { DEBUG, state } from './src/game/state.js';
 import { startTransport, onBeat, getBPM, setTempo } from './src/audio/transport.js';
 import { createPlayerVoice, createCellVoice, createCloneVoice, voiceCount,
          resolutionCadence, dissonantStab,
-         setMasterVolume, proteinAttachSound, proteinDetachSound, deathSequence }
+         setMasterVolume, setChorusDepth, proteinAttachSound, proteinDetachSound, deathSequence }
   from './src/audio/synthesis.js';
 import { roughness, DEFAULT_TIMBRE } from './src/audio/consonance.js';
 import { Player, Cell, Clone } from './src/game/entities.js';
@@ -144,6 +144,7 @@ function init() {
     state.nearestCellNote   = nearest ? nearest.getActiveNote(player.x, player.y) : cNote;
     state.voiceCount        = voiceCount();
     setMasterVolume(getBPM());
+    setChorusDepth(Math.min(1, clones.length / 20)); // full width at 20 clones (160 BPM ceiling)
 
     // Trigger the 2 nearest clones as ambient pitched voices
     const nearClones = [...clones]
