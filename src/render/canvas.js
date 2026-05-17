@@ -80,6 +80,21 @@ export function drawCell(ctx, cell) {
   }
 }
 
+// Returns the point where a ray from (cx,cy) in direction (nx,ny) exits a convex polygon.
+function rayPolygonEdge(cx, cy, nx, ny, vertices) {
+  for (let i = 0; i < vertices.length; i++) {
+    const a = vertices[i], b = vertices[(i + 1) % vertices.length];
+    const ex = b.x - a.x, ey = b.y - a.y;
+    const dx = a.x - cx,  dy = a.y - cy;
+    const denom = nx * ey - ny * ex;
+    if (Math.abs(denom) < 1e-10) continue;
+    const t = (dx * ey - dy * ex) / denom;
+    const u = -(dy * nx - dx * ny) / denom;
+    if (t >= 0 && u >= 0 && u <= 1) return { x: cx + nx * t, y: cy + ny * t };
+  }
+  return { x: cx + nx * 30, y: cy + ny * 30 }; // fallback (should never trigger)
+}
+
 export function drawGlow(ctx, player, cell, roughness) {
   // Show glow for any rough value below 0.6; green = consonant, amber = dissonant-but-close
   const proximity = Math.max(0, (0.6 - roughness) / 0.6);
@@ -95,10 +110,10 @@ export function drawGlow(ctx, player, cell, roughness) {
   if (gap > 250) return;
 
   const nx = dx / dist, ny = dy / dist;
-  const x1 = player.x + nx * player.radius;
-  const y1 = player.y + ny * player.radius;
-  const x2 = cell.x   - nx * cell.radius;
-  const y2 = cell.y   - ny * cell.radius;
+  const p1  = rayPolygonEdge(player.x, player.y, nx, ny, player.getDots());
+  const x1  = p1.x, y1 = p1.y;
+  const x2  = cell.x - nx * cell.radius;
+  const y2  = cell.y - ny * cell.radius;
 
   // Colour shifts green as roughness drops below threshold
   const consonance = Math.max(0, (0.3 - roughness) / 0.3);
