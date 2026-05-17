@@ -6,4 +6,8 @@ export const state = {
   roughness: 0,
   playerNote: null,
   cellNote: null,
+  committedCellNote: null,
+  nearestCellNote:   null,
+  proteinCount: 0,
+  dead: false,
 };

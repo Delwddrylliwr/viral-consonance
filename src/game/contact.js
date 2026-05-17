@@ -1,4 +1,4 @@
-import { Cell } from './entities.js';
+import { Cell, ComplementProtein } from './entities.js';
 
 export const INFECTION_THRESHOLD = 0.3;
 
@@ -22,6 +22,20 @@ export function spawnCell(playerX, playerY, minDist = 200, maxDist = 380) {
   const angle = Math.random() * Math.PI * 2;
   const dist  = minDist + Math.random() * (maxDist - minDist);
   return new Cell(
+    playerX + Math.cos(angle) * dist,
+    playerY + Math.sin(angle) * dist,
+  );
+}
+
+export function checkContactProtein(player, protein) {
+  return Math.hypot(protein.x - player.x, protein.y - player.y)
+    < player.radius + protein.radius;
+}
+
+export function spawnProtein(playerX, playerY) {
+  const angle = Math.random() * Math.PI * 2;
+  const dist  = 280 + Math.random() * 120; // 280–400 px from player
+  return new ComplementProtein(
     playerX + Math.cos(angle) * dist,
     playerY + Math.sin(angle) * dist,
   );
