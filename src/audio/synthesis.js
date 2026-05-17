@@ -44,15 +44,17 @@ export function createPlayerVoice() {
 export function createCellVoice() {
   const synth = new Tone.Synth({
     oscillator: { type: 'sine' },
-    envelope: { attack: 0.01, decay: 0.25, sustain: 0.0, release: 0.1 },
+    // Decay extended so the note rings for ~560 ms — long enough to hear
+    // dissonance against the player chord without overlapping the next beat.
+    envelope: { attack: 0.01, decay: 0.45, sustain: 0.0, release: 0.1 },
   }).toDestination();
   synth.volume.value = -12;
 
   return {
     trigger(hz) {
       _voiceCount++;
-      synth.triggerAttackRelease(hz, '8n');
-      setTimeout(() => { _voiceCount = Math.max(0, _voiceCount - 1); }, 400);
+      synth.triggerAttackRelease(hz, '4n'); // quarter-note hold lets decay complete
+      setTimeout(() => { _voiceCount = Math.max(0, _voiceCount - 1); }, 700);
     },
   };
 }
@@ -74,6 +76,41 @@ export function resolutionCadence() {
     _voiceCount = Math.max(0, _voiceCount - 4);
     poly.dispose();
   }, 3500);
+}
+
+// Master volume tracks tempo: quiet at floor (60 BPM), full at ceiling (160 BPM)
+export function setMasterVolume(bpm) {
+  const db = -18 + ((bpm - 60) / 100) * 18; // -18 dB → 0 dB
+  Tone.getDestination().volume.rampTo(db, 0.5);
+}
+
+// Brief high dissonance ping when a complement protein attaches
+export function proteinAttachSound() {
+  const poly = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: 'sine' },
+    envelope: { attack: 0.01, decay: 0.3, sustain: 0, release: 0.1 },
+  }).toDestination();
+  poly.volume.value = -14;
+  poly.triggerAttackRelease(['E5', 'F5'], '16n');
+  setTimeout(() => poly.dispose(), 600);
+}
+
+// Short ascending run when a protein is shaken off
+export function proteinDetachSound() {
+  const synth = new Tone.Synth({
+    oscillator: { type: 'triangle' },
+    envelope: { attack: 0.01, decay: 0.15, sustain: 0, release: 0.05 },
+  }).toDestination();
+  synth.volume.value = -14;
+  const now = Tone.now();
+  ['C5', 'E5', 'G5'].forEach((n, i) => synth.triggerAttackRelease(n, '32n', now + i * 0.06));
+  setTimeout(() => synth.dispose(), 800);
+}
+
+// Ramp master volume to silence over 4 s then call onComplete
+export function deathSequence(onComplete) {
+  Tone.getDestination().volume.rampTo(-60, 4);
+  setTimeout(onComplete, 4000);
 }
 
 // Short dissonant minor-second stab
