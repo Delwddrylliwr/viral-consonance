@@ -10,8 +10,8 @@ const PROTEIN_REPLACEMENTS = [277.18, 311.13, 415.30]; // C#4, Eb4, G#4
 //   type 2 – Db major : all minor-2nd relationships → hard (very specific alignment needed)
 const CELL_DEFS = [
   { motif: [261.63, 329.63, 392.00, 523.25], color: '#f84', rotPeriod: 2.4 },
-  { motif: [196.00, 293.66, 392.00, 587.33], color: '#5cf', rotPeriod: 3.2 },
-  { motif: [277.18, 349.23, 415.30, 554.37], color: '#c47', rotPeriod: 1.7 },
+  { motif: [196.00, 293.66, 392.00, 587.33], color: '#5cf', rotPeriod: 2.4 },
+  { motif: [277.18, 349.23, 415.30, 554.37], color: '#c47', rotPeriod: 2.4 },
 ];
 const CELL_DRIFT = 18; // px/s gentle background drift
 

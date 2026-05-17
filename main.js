@@ -187,14 +187,11 @@ function loop(ts) {
   for (const c of cells) c.update(dt);
   for (const p of proteins) p.update(dt, player);
 
-  // Protein attachment — each attach suppresses viral tempo
+  // Protein attachment
   for (const p of proteins) {
     if (!p.attached && checkContactProtein(player, p)) {
       p.attach(player);
       proteinAttachSound();
-      const newBpm = adjustTempo(-3);
-      setMasterVolume(newBpm);
-      if (newBpm <= 60 && !dead) triggerDeath();
     }
   }
 
@@ -237,6 +234,9 @@ function loop(ts) {
     } else {
       bouncePlayer(player, c, r);
       dissonantStab();
+      const newBpm = adjustTempo(-3);
+      setMasterVolume(newBpm);
+      if (newBpm <= 60 && !dead) triggerDeath();
     }
   }
 
