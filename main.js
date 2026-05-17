@@ -201,12 +201,13 @@ function loop(ts) {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.restore();
     if (deathFade >= 0.95) {
-      const avgBpm = gameTime > 0 ? Math.round(bpmAccum / gameTime) : 0;
+      const avgBpm = gameTime > 0 ? bpmAccum / gameTime : BASE_BPM;
+      const avgViralLoad = Math.max(0, Math.round((avgBpm - BASE_BPM) / BPM_PER_CLONE));
       ctx.save();
       ctx.font = '26px monospace';
       ctx.fillStyle = '#888';
       ctx.textAlign = 'center';
-      ctx.fillText(`avg BPM  ${avgBpm}`, canvas.width / 2, canvas.height / 2 - 18);
+      ctx.fillText(`avg viral load  ${avgViralLoad}`, canvas.width / 2, canvas.height / 2 - 18);
       ctx.font = '15px monospace';
       ctx.fillStyle = '#444';
       ctx.fillText('click to restart', canvas.width / 2, canvas.height / 2 + 18);
