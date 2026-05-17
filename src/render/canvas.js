@@ -109,6 +109,18 @@ export function drawGlow(ctx, player, cell, roughness) {
   ctx.restore();
 }
 
+export function drawProtein(ctx, protein) {
+  const color = protein.attached ? '#f55' : '#f93';
+  drawCircle(ctx, protein.x, protein.y, protein.radius, color, 0.85);
+  ctx.save();
+  ctx.globalAlpha = 0.6;
+  ctx.beginPath();
+  ctx.arc(protein.x, protein.y, 4, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+  ctx.restore();
+}
+
 // Brief full-screen flash on infection
 export function drawInfectionFlash(ctx, alpha) {
   if (alpha <= 0) return;

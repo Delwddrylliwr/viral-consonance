@@ -2,11 +2,13 @@ import { hzToName } from '../audio/scale.js';
 
 export function drawDebug(ctx, state) {
   const lines = [
-    `TEMPO:    ${state.tempo} BPM`,
-    `VOICES:   ${state.voiceCount}/8`,
+    `TEMPO:     ${state.tempo.toFixed(1)} BPM`,
+    `VOICES:    ${state.voiceCount}/8`,
     `ROUGHNESS: ${state.roughness.toFixed(3)}`,
-    `PLAYER:   ${hzToName(state.playerNote)}`,
-    `CELL:     ${hzToName(state.cellNote)}`,
+    `PLAYER:    ${hzToName(state.playerNote)}`,
+    `COMMITTED: ${hzToName(state.committedCellNote)}`,
+    `NEAREST:   ${hzToName(state.nearestCellNote)}`,
+    `PROTEINS:  ${state.proteinCount}`,
   ];
 
   ctx.save();
