@@ -46,7 +46,7 @@ canvas.addEventListener('touchend',    handleTouch, { passive: false });
 canvas.addEventListener('touchcancel', handleTouch, { passive: false });
 
 const MAX_CELLS      = 5;  // target active cell count
-const PROTEIN_TARGET = 3;  // target free-floating protein count
+const PROTEIN_TARGET = 8;  // target free-floating protein count
 const PROTEIN_RANGE  = 800; // remove proteins that wander beyond this radius
 
 let player, cells, committedCell, proteins, playerVoice, cellVoice;
@@ -187,11 +187,14 @@ function loop(ts) {
   for (const c of cells) c.update(dt);
   for (const p of proteins) p.update(dt, player);
 
-  // Protein attachment
+  // Protein attachment — each attach suppresses viral tempo
   for (const p of proteins) {
     if (!p.attached && checkContactProtein(player, p)) {
       p.attach(player);
       proteinAttachSound();
+      const newBpm = adjustTempo(-3);
+      setMasterVolume(newBpm);
+      if (newBpm <= 60 && !dead) triggerDeath();
     }
   }
 
@@ -234,9 +237,6 @@ function loop(ts) {
     } else {
       bouncePlayer(player, c, r);
       dissonantStab();
-      const newBpm = adjustTempo(-3);
-      setMasterVolume(newBpm);
-      if (newBpm <= 60 && !dead) triggerDeath();
     }
   }
 
