@@ -132,7 +132,9 @@ function init() {
     const pNote   = player.getActiveNote(committedCell.x, committedCell.y);
     const cNote   = committedCell.getActiveNote(player.x, player.y);
 
-    cellVoice.trigger(cNote);
+    const distToCell = Math.hypot(committedCell.x - player.x, committedCell.y - player.y);
+    const cellVolDb = Math.max(-35, -12 - (distToCell / 600) * 20);
+    cellVoice.trigger(cNote, cellVolDb);
     playerVoice.setFreq(pNote);
 
     state.roughness         = roughness([pNote], [cNote], DEFAULT_TIMBRE);

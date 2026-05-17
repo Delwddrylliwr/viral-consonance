@@ -57,7 +57,8 @@ export function createCellVoice() {
   synth.volume.value = -12;
 
   return {
-    trigger(hz) {
+    trigger(hz, volumeDb = -12) {
+      synth.volume.value = volumeDb;
       _voiceCount++;
       synth.triggerAttackRelease(hz, '4n'); // quarter-note hold lets decay complete
       setTimeout(() => { _voiceCount = Math.max(0, _voiceCount - 1); }, 700);
