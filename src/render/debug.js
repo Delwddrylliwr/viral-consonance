@@ -10,6 +10,7 @@ export function drawDebug(ctx, state) {
     `NEAREST:   ${hzToName(state.nearestCellNote)}`,
     `CELLS:     ${state.cellCount}`,
     `PROTEINS:  ${state.proteinCount}`,
+    `CLONES:    ${state.cloneCount}`,
   ];
 
   ctx.save();

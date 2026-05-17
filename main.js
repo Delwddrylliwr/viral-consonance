@@ -1,13 +1,13 @@
-import { initCanvas, clear, drawPlayer, drawCell, drawGlow, drawInfectionFlash, drawProtein } from './src/render/canvas.js';
+import { initCanvas, clear, drawPlayer, drawCell, drawGlow, drawInfectionFlash, drawProtein, drawClone } from './src/render/canvas.js';
 import { drawDebug } from './src/render/debug.js';
 import { DEBUG, state } from './src/game/state.js';
-import { startTransport, onBeat, getBPM, adjustTempo } from './src/audio/transport.js';
-import { createPlayerVoice, createCellVoice, voiceCount,
+import { startTransport, onBeat, getBPM, setTempo } from './src/audio/transport.js';
+import { createPlayerVoice, createCellVoice, createCloneVoice, voiceCount,
          resolutionCadence, dissonantStab,
          setMasterVolume, proteinAttachSound, proteinDetachSound, deathSequence }
   from './src/audio/synthesis.js';
 import { roughness, DEFAULT_TIMBRE } from './src/audio/consonance.js';
-import { Player, Cell } from './src/game/entities.js';
+import { Player, Cell, Clone } from './src/game/entities.js';
 import { checkContact, bouncePlayer, spawnCell, INFECTION_THRESHOLD,
          checkContactProtein, spawnProtein }
   from './src/game/contact.js';
@@ -48,9 +48,15 @@ canvas.addEventListener('touchcancel', handleTouch, { passive: false });
 const MAX_CELLS        = 5;   // target active cell count
 const PROTEIN_TARGET   = 8;   // target free-floating protein count
 const PROTEIN_RANGE    = 800; // remove proteins that wander beyond this radius
-const TEMPO_DRAIN_RATE = 0.5; // BPM/s passive decay — must keep infecting to stay alive
 
-let player, cells, committedCell, proteins, playerVoice, cellVoice;
+// BPM = BASE_BPM + clones.length * BPM_PER_CLONE  (viral load drives tempo)
+const BASE_BPM                 = 60;
+const BPM_PER_CLONE            = 5;
+const MAX_CLONES_PER_INFECTION = 3;
+const MAX_CLONES_PER_BOUNCE    = 3;
+const STARTER_CLONES           = 8; // gives 100 BPM at game start
+
+let player, cells, committedCell, proteins, clones, playerVoice, cellVoice, cloneVoice;
 let infectionFlash = 0;
 let dead = false;
 let deathFade = 0;
@@ -95,6 +101,13 @@ function init() {
 
   proteins = Array.from({ length: PROTEIN_TARGET }, () => spawnProtein(cx, cy));
 
+  // Starter clones give 100 BPM from the first frame (8 × 5 + 60)
+  clones = Array.from({ length: STARTER_CLONES }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const dist  = 80 + Math.random() * 80;
+    return new Clone(cx + Math.cos(angle) * dist, cy + Math.sin(angle) * dist, player.chord);
+  });
+
   dead      = false;
   deathFade = 0;
   gameTime  = 0;
@@ -103,6 +116,7 @@ function init() {
 
   playerVoice = createPlayerVoice();
   cellVoice   = createCellVoice();
+  cloneVoice  = createCloneVoice();
 
   onBeat(() => {
     updateCommittedCell();
@@ -110,6 +124,7 @@ function init() {
     state.tempo        = getBPM();
     state.cellCount    = cells.filter(c => c.active).length;
     state.proteinCount = proteins.length;
+    state.cloneCount   = clones.length;
 
     if (!committedCell) return;
 
@@ -126,7 +141,14 @@ function init() {
     state.committedCellNote = cNote;
     state.nearestCellNote   = nearest ? nearest.getActiveNote(player.x, player.y) : cNote;
     state.voiceCount        = voiceCount();
-    setMasterVolume(getBPM()); // keep volume in sync with passive drain
+    setMasterVolume(getBPM());
+
+    // Trigger the 2 nearest clones as ambient pitched voices
+    const nearClones = [...clones]
+      .sort((a, b) => Math.hypot(a.x - player.x, a.y - player.y)
+                    - Math.hypot(b.x - player.x, b.y - player.y))
+      .slice(0, 2);
+    for (const c of nearClones) cloneVoice.trigger(c.activeNote());
   });
 }
 
@@ -147,7 +169,7 @@ document.getElementById('start').addEventListener('click', async () => {
       new Promise((_, rej) => setTimeout(() => rej(new Error('audio timeout — tap again')), 4000)),
     ]);
     span.textContent = 'loading…';
-    startTransport(100);
+    startTransport(BASE_BPM);
     init();
     startEl.remove();
     requestAnimationFrame(loop);
@@ -196,9 +218,10 @@ function loop(ts) {
   gameTime += dt;
   bpmAccum += getBPM() * dt;
 
-  // Passive tempo drain — idle play is penalised
-  const drainedBpm = adjustTempo(-TEMPO_DRAIN_RATE * dt);
-  if (drainedBpm <= 60 && !dead) triggerDeath();
+  // Clone lifecycle — expired clones reduce viral load (and thus BPM)
+  clones = clones.filter(c => c.alive);
+  for (const c of clones) c.update(dt);
+  setTempo(Math.min(160, BASE_BPM + clones.length * BPM_PER_CLONE));
 
   // Update entities
   player.update(dt, input, now);
@@ -240,10 +263,19 @@ function loop(ts) {
       c.flashTimer = 0.5;
       infectionFlash = 1;
       resolutionCadence();
-      // Consonance bonus: perfect match (+10 BPM) down to bare threshold (+3 BPM)
-      const bpmGain = Math.round(3 + (1 - r / INFECTION_THRESHOLD) * 7);
-      const newBpm  = adjustTempo(bpmGain);
-      setMasterVolume(newBpm);
+      // Spawn clones: each of 3 slots succeeds with probability ∝ consonance
+      const spawnProb = Math.max(0, 1 - r / INFECTION_THRESHOLD);
+      for (let i = 0; i < MAX_CLONES_PER_INFECTION; i++) {
+        if (Math.random() < spawnProb) {
+          clones.push(new Clone(
+            c.x + (Math.random() - 0.5) * 60,
+            c.y + (Math.random() - 0.5) * 60,
+            player.chord,
+          ));
+        }
+      }
+      setTempo(Math.min(160, BASE_BPM + clones.length * BPM_PER_CLONE));
+      setMasterVolume(getBPM());
       setTimeout(() => {
         cells = cells.filter(x => x.active || x.flashTimer > 0);
         while (cells.filter(x => x.active).length < MAX_CELLS) {
@@ -254,11 +286,19 @@ function loop(ts) {
     } else {
       bouncePlayer(player, c, r);
       dissonantStab();
-      const newBpm = adjustTempo(-3);
-      setMasterVolume(newBpm);
-      if (newBpm <= 60 && !dead) triggerDeath();
+      // Kill clones: each of 3 slots dies with probability ∝ dissonance (mirror of spawn)
+      const killProb = Math.min(1, (r - INFECTION_THRESHOLD) / (1 - INFECTION_THRESHOLD));
+      clones.sort((a, b) => a.lifetime - b.lifetime); // kill oldest first
+      for (let i = 0; i < MAX_CLONES_PER_BOUNCE; i++) {
+        if (Math.random() < killProb && clones.length > 0) clones.shift();
+      }
+      setTempo(Math.min(160, BASE_BPM + clones.length * BPM_PER_CLONE));
+      setMasterVolume(getBPM());
     }
   }
+
+  // Death when viral load (clone count) hits zero
+  if (getBPM() <= BASE_BPM && !dead) triggerDeath();
 
   // Cell leash: replace active cells that have drifted beyond 600 px from player
   cells = cells.map(c => {
@@ -291,6 +331,7 @@ function loop(ts) {
     }
     drawCell(ctx, c);
   }
+  for (const c of clones) drawClone(ctx, c);
   drawPlayer(ctx, player, activePlayerNote);
   for (const p of proteins) drawProtein(ctx, p);
 

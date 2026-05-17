@@ -10,5 +10,6 @@ export const state = {
   nearestCellNote:   null,
   cellCount: 0,
   proteinCount: 0,
+  cloneCount: 0,
   dead: false,
 };
