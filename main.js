@@ -45,9 +45,10 @@ canvas.addEventListener('touchmove',   handleTouch, { passive: false });
 canvas.addEventListener('touchend',    handleTouch, { passive: false });
 canvas.addEventListener('touchcancel', handleTouch, { passive: false });
 
-const MAX_CELLS      = 5;  // target active cell count
-const PROTEIN_TARGET = 8;  // target free-floating protein count
-const PROTEIN_RANGE  = 800; // remove proteins that wander beyond this radius
+const MAX_CELLS        = 5;   // target active cell count
+const PROTEIN_TARGET   = 8;   // target free-floating protein count
+const PROTEIN_RANGE    = 800; // remove proteins that wander beyond this radius
+const TEMPO_DRAIN_RATE = 0.5; // BPM/s passive decay — must keep infecting to stay alive
 
 let player, cells, committedCell, proteins, playerVoice, cellVoice;
 let infectionFlash = 0;
@@ -125,6 +126,7 @@ function init() {
     state.committedCellNote = cNote;
     state.nearestCellNote   = nearest ? nearest.getActiveNote(player.x, player.y) : cNote;
     state.voiceCount        = voiceCount();
+    setMasterVolume(getBPM()); // keep volume in sync with passive drain
   });
 }
 
@@ -194,6 +196,10 @@ function loop(ts) {
   gameTime += dt;
   bpmAccum += getBPM() * dt;
 
+  // Passive tempo drain — idle play is penalised
+  const drainedBpm = adjustTempo(-TEMPO_DRAIN_RATE * dt);
+  if (drainedBpm <= 60 && !dead) triggerDeath();
+
   // Update entities
   player.update(dt, input, now);
   for (const c of cells) c.update(dt);
@@ -234,7 +240,9 @@ function loop(ts) {
       c.flashTimer = 0.5;
       infectionFlash = 1;
       resolutionCadence();
-      const newBpm = adjustTempo(+5);
+      // Consonance bonus: perfect match (+10 BPM) down to bare threshold (+3 BPM)
+      const bpmGain = Math.round(3 + (1 - r / INFECTION_THRESHOLD) * 7);
+      const newBpm  = adjustTempo(bpmGain);
       setMasterVolume(newBpm);
       setTimeout(() => {
         cells = cells.filter(x => x.active || x.flashTimer > 0);
