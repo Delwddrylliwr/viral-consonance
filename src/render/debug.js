@@ -8,6 +8,7 @@ export function drawDebug(ctx, state) {
     `PLAYER:    ${hzToName(state.playerNote)}`,
     `COMMITTED: ${hzToName(state.committedCellNote)}`,
     `NEAREST:   ${hzToName(state.nearestCellNote)}`,
+    `CELLS:     ${state.cellCount}`,
     `PROTEINS:  ${state.proteinCount}`,
   ];
 

@@ -8,6 +8,7 @@ export const state = {
   cellNote: null,
   committedCellNote: null,
   nearestCellNote:   null,
+  cellCount: 0,
   proteinCount: 0,
   dead: false,
 };

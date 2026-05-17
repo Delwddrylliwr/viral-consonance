@@ -7,23 +7,33 @@ export function checkContact(player, cell) {
   return dist < player.radius + cell.radius;
 }
 
-// Push player cleanly outside the cell's boundary
-export function bouncePlayer(player, cell) {
-  const dx    = player.x - cell.x;
-  const dy    = player.y - cell.y;
-  const dist  = Math.hypot(dx, dy) || 1;
-  const push  = player.radius + cell.radius - dist + 4;
-  player.x += (dx / dist) * push;
-  player.y += (dy / dist) * push;
+// Push player outside the cell and apply roughness-proportional knockback velocity.
+// r = 0 at threshold, up to 1 at maximum roughness → knockback 60–400 px/s.
+export function bouncePlayer(player, cell, r = 0.5) {
+  const dx   = player.x - cell.x;
+  const dy   = player.y - cell.y;
+  const dist = Math.hypot(dx, dy) || 1;
+  const nx   = dx / dist, ny = dy / dist;
+  const overlap = player.radius + cell.radius - dist;
+  if (overlap > 0) {
+    player.x += nx * (overlap + 2);
+    player.y += ny * (overlap + 2);
+  }
+  const t     = Math.max(0, (r - INFECTION_THRESHOLD) / (1 - INFECTION_THRESHOLD));
+  const speed = 60 + t * 340;
+  player.knockbackX = nx * speed;
+  player.knockbackY = ny * speed;
 }
 
-// Spawn a new cell at a random distance/angle from the player in world space
-export function spawnCell(playerX, playerY, minDist = 200, maxDist = 380) {
-  const angle = Math.random() * Math.PI * 2;
-  const dist  = minDist + Math.random() * (maxDist - minDist);
+// Spawn a new cell. Pass type 0–2 explicitly, or -1 for random.
+export function spawnCell(playerX, playerY, minDist = 200, maxDist = 380, type = -1) {
+  const angle    = Math.random() * Math.PI * 2;
+  const dist     = minDist + Math.random() * (maxDist - minDist);
+  const cellType = type < 0 ? Math.floor(Math.random() * 3) : type;
   return new Cell(
     playerX + Math.cos(angle) * dist,
     playerY + Math.sin(angle) * dist,
+    cellType,
   );
 }
 

@@ -7,7 +7,7 @@ import { createPlayerVoice, createCellVoice, voiceCount,
          setMasterVolume, proteinAttachSound, proteinDetachSound, deathSequence }
   from './src/audio/synthesis.js';
 import { roughness, DEFAULT_TIMBRE } from './src/audio/consonance.js';
-import { Player, Cell, ComplementProtein } from './src/game/entities.js';
+import { Player, Cell } from './src/game/entities.js';
 import { checkContact, bouncePlayer, spawnCell, INFECTION_THRESHOLD,
          checkContactProtein, spawnProtein }
   from './src/game/contact.js';
@@ -45,11 +45,14 @@ canvas.addEventListener('touchmove',   handleTouch, { passive: false });
 canvas.addEventListener('touchend',    handleTouch, { passive: false });
 canvas.addEventListener('touchcancel', handleTouch, { passive: false });
 
-let player, cells, committedCell, protein, playerVoice, cellVoice;
-let infectionFlash  = 0;
-let proteinSpawnTimer = 20; // seconds until first protein appears
+const MAX_CELLS      = 5;  // target active cell count
+const PROTEIN_TARGET = 3;  // target free-floating protein count
+const PROTEIN_RANGE  = 800; // remove proteins that wander beyond this radius
+
+let player, cells, committedCell, proteins, playerVoice, cellVoice;
+let infectionFlash = 0;
 let dead = false;
-let deathFade = 0; // 0→1 over 4 s for the death overlay
+let deathFade = 0;
 
 // --- A+B helpers ---
 
@@ -62,8 +65,6 @@ function nearestActiveCell() {
   }, null);
 }
 
-// Option A: only runs inside onBeat, so switches land on the beat grid.
-// Option B: challenger must be ≥ 20% closer to displace committed cell.
 function updateCommittedCell() {
   const nearest = nearestActiveCell();
   if (!nearest) return;
@@ -76,12 +77,22 @@ function updateCommittedCell() {
 function init() {
   const cx = canvas.width  / 2;
   const cy = canvas.height / 2;
+
   player = new Player(cx, cy);
-  cells  = [new Cell(cx + 220, cy - 60)];
+
+  // Start with two guaranteed type-0 (easy) cells close by, then fill with variety
+  cells = [
+    new Cell(cx + 220, cy - 60,  0),
+    new Cell(cx - 180, cy + 100, 0),
+    spawnCell(cx, cy, 260, 380, 1),
+    spawnCell(cx, cy, 260, 380, 2),
+    spawnCell(cx, cy, 280, 420),
+  ];
   committedCell = cells[0];
-  protein = null;
-  proteinSpawnTimer = 20;
-  dead = false;
+
+  proteins = Array.from({ length: PROTEIN_TARGET }, () => spawnProtein(cx, cy));
+
+  dead      = false;
   deathFade = 0;
   state.dead = false;
 
@@ -89,9 +100,12 @@ function init() {
   cellVoice   = createCellVoice();
 
   onBeat(() => {
-    updateCommittedCell(); // beat-quantised attention switch with hysteresis
+    updateCommittedCell();
 
-    state.tempo = getBPM();
+    state.tempo        = getBPM();
+    state.cellCount    = cells.filter(c => c.active).length;
+    state.proteinCount = proteins.length;
+
     if (!committedCell) return;
 
     const nearest = nearestActiveCell();
@@ -107,7 +121,6 @@ function init() {
     state.committedCellNote = cNote;
     state.nearestCellNote   = nearest ? nearest.getActiveNote(player.x, player.y) : cNote;
     state.voiceCount        = voiceCount();
-    state.proteinCount      = protein ? 1 : 0;
   });
 }
 
@@ -150,7 +163,7 @@ function loop(ts) {
   last = ts;
 
   if (dead) {
-    deathFade = Math.min(1, deathFade + dt / 4); // sync with 4 s audio fade
+    deathFade = Math.min(1, deathFade + dt / 4);
     clear(ctx);
     ctx.save();
     ctx.globalAlpha = deathFade * 0.92;
@@ -169,24 +182,33 @@ function loop(ts) {
     return;
   }
 
+  // Update entities
   player.update(dt, input, now);
   for (const c of cells) c.update(dt);
+  for (const p of proteins) p.update(dt, player);
 
-  // Protein lifecycle
-  if (protein) {
-    protein.update(dt, player);
-    if (protein.attached && player.detectShake(now)) {
-      protein.detach(player);
-      proteinDetachSound();
-      protein = null;
-      proteinSpawnTimer = 25; // next protein after shake-off
-    } else if (!protein.attached && checkContactProtein(player, protein)) {
-      protein.attach(player);
+  // Protein attachment
+  for (const p of proteins) {
+    if (!p.attached && checkContactProtein(player, p)) {
+      p.attach(player);
       proteinAttachSound();
     }
-  } else {
-    proteinSpawnTimer -= dt;
-    if (proteinSpawnTimer <= 0) protein = spawnProtein(player.x, player.y);
+  }
+
+  // Protein shake-off (only play sound when something actually detaches)
+  if (player.detectShake(now)) {
+    let shookAny = false;
+    for (const p of proteins) {
+      if (p.attached) { p.detach(player); shookAny = true; }
+    }
+    if (shookAny) proteinDetachSound();
+  }
+
+  // Pool maintenance: replace proteins that have wandered too far
+  proteins = proteins.filter(p => p.attached || Math.hypot(p.x - player.x, p.y - player.y) <= PROTEIN_RANGE);
+  const freeCount = proteins.filter(p => !p.attached).length;
+  for (let i = freeCount; i < PROTEIN_TARGET; i++) {
+    proteins.push(spawnProtein(player.x, player.y));
   }
 
   // Cell contact
@@ -196,19 +218,21 @@ function loop(ts) {
     const cNote = c.getActiveNote(player.x, player.y);
     const r     = roughness([pNote], [cNote], DEFAULT_TIMBRE);
     if (r < INFECTION_THRESHOLD) {
-      c.active = false; c.flashTimer = 0.5;
+      c.active = false;
+      c.flashTimer = 0.5;
       infectionFlash = 1;
       resolutionCadence();
       const newBpm = adjustTempo(+5);
       setMasterVolume(newBpm);
       setTimeout(() => {
         cells = cells.filter(x => x.active || x.flashTimer > 0);
-        const fresh = spawnCell(player.x, player.y);
-        cells.push(fresh);
-        if (!committedCell || !committedCell.active) committedCell = fresh;
+        while (cells.filter(x => x.active).length < MAX_CELLS) {
+          cells.push(spawnCell(player.x, player.y));
+        }
+        if (!committedCell || !committedCell.active) committedCell = nearestActiveCell();
       }, 650);
     } else {
-      bouncePlayer(player, c);
+      bouncePlayer(player, c, r);
       dissonantStab();
       const newBpm = adjustTempo(-3);
       setMasterVolume(newBpm);
@@ -222,17 +246,26 @@ function loop(ts) {
 
   infectionFlash = Math.max(0, infectionFlash - dt * 2.5);
 
+  // Render
   clear(ctx);
 
   ctx.save();
   ctx.translate(canvas.width / 2 - player.x, canvas.height / 2 - player.y);
 
   for (const c of cells) {
-    drawGlow(ctx, player, c, committedCell === c ? state.roughness : 1);
+    if (!c.active && c.flashTimer <= 0) continue;
+    if (c.active) {
+      const r = roughness(
+        [player.getActiveNote(c.x, c.y)],
+        [c.getActiveNote(player.x, player.y)],
+        DEFAULT_TIMBRE,
+      );
+      drawGlow(ctx, player, c, r);
+    }
     drawCell(ctx, c);
   }
   drawPlayer(ctx, player, activePlayerNote);
-  if (protein) drawProtein(ctx, protein);
+  for (const p of proteins) drawProtein(ctx, p);
 
   ctx.restore();
 

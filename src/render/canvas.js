@@ -53,7 +53,7 @@ export function drawCell(ctx, cell) {
   const alpha = cell.flashTimer > 0
     ? 0.5 + 0.5 * (cell.flashTimer / 0.5)
     : 0.6;
-  const color = cell.flashTimer > 0 ? '#fff' : '#f84';
+  const color = cell.flashTimer > 0 ? '#fff' : cell.color;
 
   drawCircle(ctx, cell.x, cell.y, cell.radius, color, alpha);
 

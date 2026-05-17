@@ -1,12 +1,22 @@
-import { PLAYER_CHORD, CELL_MOTIF } from '../audio/scale.js';
+import { PLAYER_CHORD } from '../audio/scale.js';
 
-// Semitone replacements for each player chord note (C4, E4, G4) chosen to
-// maximise roughness against C major: C#4, Eb4, G#4.
-const PROTEIN_REPLACEMENTS = [277.18, 311.13, 415.30];
+// Dissonant substitutes for player chord notes [C4, E4, G4]:
+// half-step neighbours to maximise roughness when attached.
+const PROTEIN_REPLACEMENTS = [277.18, 311.13, 415.30]; // C#4, Eb4, G#4
+
+// Three cell types. Motifs chosen against the player chord [C4=261.63, E4=329.63, G4=392.00]:
+//   type 0 – C major  : shares notes → lots of unisons/3rds → easy
+//   type 1 – G major  : 5th/4th relationships → medium (approach angle matters)
+//   type 2 – Db major : all minor-2nd relationships → hard (very specific alignment needed)
+const CELL_DEFS = [
+  { motif: [261.63, 329.63, 392.00, 523.25], color: '#f84', rotPeriod: 2.4 },
+  { motif: [196.00, 293.66, 392.00, 587.33], color: '#5cf', rotPeriod: 3.2 },
+  { motif: [277.18, 349.23, 415.30, 554.37], color: '#c47', rotPeriod: 1.7 },
+];
+const CELL_DRIFT = 18; // px/s gentle background drift
 
 function angleDiff(a, b) {
-  let d = ((a - b) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI;
-  return d;
+  return ((a - b) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI;
 }
 
 export class Player {
@@ -14,13 +24,15 @@ export class Player {
     this.x = x;
     this.y = y;
     this.radius = 30;
-    this.speed  = 200;           // px/sec
-    this.baseChord = [...PLAYER_CHORD]; // immutable reference; proteins mutate chord
+    this.speed  = 200;
+    this.baseChord = [...PLAYER_CHORD];
     this.chord     = [...PLAYER_CHORD];
     this.rotation      = 0;
-    this.rotationSpeed = Math.PI / 4; // 1 rev per 8 s
+    this.rotationSpeed = Math.PI / 4;
     this.vx = 0; this.vy = 0;
-    this.velHistory = []; // [{vx, vy, t}] rolling 300 ms buffer for shake detection
+    this.velHistory = [];
+    this.knockbackX = 0;
+    this.knockbackY = 0;
   }
 
   update(dt, input, now) {
@@ -32,12 +44,20 @@ export class Player {
     this.vy = dy * this.speed;
     this.velHistory.push({ vx: this.vx, vy: this.vy, t: now });
     this.velHistory = this.velHistory.filter(e => now - e.t < 0.3);
-    this.x += this.vx * dt;
-    this.y += this.vy * dt;
+
+    // Knockback decays with ~120 ms half-life
+    const decay = Math.pow(0.5, dt / 0.12);
+    this.knockbackX *= decay;
+    this.knockbackY *= decay;
+    if (Math.hypot(this.knockbackX, this.knockbackY) < 1) {
+      this.knockbackX = this.knockbackY = 0;
+    }
+
+    this.x += (this.vx + this.knockbackX) * dt;
+    this.y += (this.vy + this.knockbackY) * dt;
     this.rotation += this.rotationSpeed * dt;
   }
 
-  // True when velocity direction reversed within the last 200 ms (shake gesture).
   detectShake(now) {
     const recent = this.velHistory.filter(e => now - e.t < 0.2);
     if (recent.length < 2) return false;
@@ -59,7 +79,6 @@ export class Player {
     });
   }
 
-  // Dot whose angle points most closely toward (tx, ty)
   getActiveNote(tx, ty) {
     const toward = Math.atan2(ty - this.y, tx - this.x);
     let best = null, bestDiff = Infinity;
@@ -72,21 +91,30 @@ export class Player {
 }
 
 export class Cell {
-  constructor(x, y) {
+  constructor(x, y, type = 0) {
     this.x = x;
     this.y = y;
+    this.type   = type;
     this.radius = 45;
-    this.motif  = CELL_MOTIF;   // [C4, E4, G4, C5]
-    this.rotation      = 0;
-    // 1 full rotation per 4 beats = 2.4 s at 100 BPM
-    this.rotationSpeed = (2 * Math.PI) / 2.4;
+    const def = CELL_DEFS[type] ?? CELL_DEFS[0];
+    this.motif  = def.motif;
+    this.color  = def.color;
+    this.rotation      = Math.random() * Math.PI * 2;
+    this.rotationSpeed = (2 * Math.PI) / def.rotPeriod;
     this.flashTimer = 0;
     this.active = true;
+    const dAngle = Math.random() * Math.PI * 2;
+    this.dx = Math.cos(dAngle) * CELL_DRIFT;
+    this.dy = Math.sin(dAngle) * CELL_DRIFT;
   }
 
   update(dt) {
     this.rotation += this.rotationSpeed * dt;
     if (this.flashTimer > 0) this.flashTimer = Math.max(0, this.flashTimer - dt);
+    if (this.active) {
+      this.x += this.dx * dt;
+      this.y += this.dy * dt;
+    }
   }
 
   getDots() {
@@ -101,7 +129,6 @@ export class Cell {
     });
   }
 
-  // Dot currently facing the player
   getActiveNote(px, py) {
     const toward = Math.atan2(py - this.y, px - this.x);
     let best = null, bestDiff = Infinity;
@@ -117,13 +144,17 @@ export class ComplementProtein {
   constructor(x, y) {
     this.x = x; this.y = y;
     this.radius = 12;
-    this.speed  = 65; // px/s drift toward player
     this.attached    = false;
     this.attachAngle = 0;
     this.attachDist  = 0;
-    // Randomly targets one of the three player chord notes.
     this.targetIndex     = Math.floor(Math.random() * 3);
     this.replacementNote = PROTEIN_REPLACEMENTS[this.targetIndex];
+    // Ambient drift — no active homing toward player
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 18 + Math.random() * 16; // 18–34 px/s
+    this.dx = Math.cos(angle) * speed;
+    this.dy = Math.sin(angle) * speed;
+    this.steerTimer = 2 + Math.random() * 3;
   }
 
   update(dt, player) {
@@ -132,10 +163,18 @@ export class ComplementProtein {
       this.y = player.y + Math.sin(this.attachAngle) * this.attachDist;
       return;
     }
-    const dx = player.x - this.x, dy = player.y - this.y;
-    const d  = Math.hypot(dx, dy) || 1;
-    this.x += (dx / d) * this.speed * dt;
-    this.y += (dy / d) * this.speed * dt;
+    // Gentle random steering every few seconds
+    this.steerTimer -= dt;
+    if (this.steerTimer <= 0) {
+      this.steerTimer = 2 + Math.random() * 3;
+      const turn = (Math.random() - 0.5) * 1.2;
+      const c = Math.cos(turn), s = Math.sin(turn);
+      const nx = this.dx * c - this.dy * s;
+      const ny = this.dx * s + this.dy * c;
+      this.dx = nx; this.dy = ny;
+    }
+    this.x += this.dx * dt;
+    this.y += this.dy * dt;
   }
 
   attach(player) {
@@ -149,5 +188,14 @@ export class ComplementProtein {
   detach(player) {
     this.attached = false;
     player.chord[this.targetIndex] = player.baseChord[this.targetIndex];
+    // Flee immediately to prevent instant re-attachment
+    const dx = this.x - player.x, dy = this.y - player.y;
+    const d  = Math.hypot(dx, dy) || 1;
+    const fleeR = player.radius + this.radius + 50;
+    this.x = player.x + (dx / d) * fleeR;
+    this.y = player.y + (dy / d) * fleeR;
+    const spd = Math.hypot(this.dx, this.dy) || 25;
+    this.dx = (dx / d) * spd;
+    this.dy = (dy / d) * spd;
   }
 }
