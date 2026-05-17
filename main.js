@@ -119,11 +119,17 @@ function triggerDeath() {
 
 // Click/tap-to-start
 document.getElementById('start').addEventListener('pointerdown', async () => {
-  await Tone.start();
-  startTransport(100);
-  init();
-  document.getElementById('start').remove();
-  requestAnimationFrame(loop);
+  const startEl = document.getElementById('start');
+  try {
+    await Tone.start();
+    startTransport(100);
+    init();
+    startEl.remove();
+    requestAnimationFrame(loop);
+  } catch (err) {
+    startEl.querySelector('span').textContent = 'error: ' + err.message;
+    console.error('Start failed:', err);
+  }
 }, { once: true });
 
 // Restart after death
