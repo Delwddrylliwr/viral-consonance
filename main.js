@@ -118,19 +118,25 @@ function triggerDeath() {
 }
 
 // Click/tap-to-start
-document.getElementById('start').addEventListener('pointerdown', async () => {
+document.getElementById('start').addEventListener('click', async () => {
   const startEl = document.getElementById('start');
+  const span = startEl.querySelector('span');
   try {
-    await Tone.start();
+    span.textContent = 'starting audio…';
+    await Promise.race([
+      Tone.start(),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('audio timeout — tap again')), 4000)),
+    ]);
+    span.textContent = 'loading…';
     startTransport(100);
     init();
     startEl.remove();
     requestAnimationFrame(loop);
   } catch (err) {
-    startEl.querySelector('span').textContent = 'error: ' + err.message;
+    span.textContent = err.message;
     console.error('Start failed:', err);
   }
-}, { once: true });
+});
 
 // Restart after death
 window.addEventListener('pointerdown', () => {
