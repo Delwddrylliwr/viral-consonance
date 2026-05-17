@@ -4,7 +4,7 @@ import { DEBUG, state } from './src/game/state.js';
 import { startTransport, onBeat, getBPM, setTempo } from './src/audio/transport.js';
 import { createPlayerVoice, createCellVoice, createCloneVoice, voiceCount,
          resolutionCadence, dissonantStab,
-         setMasterVolume, proteinAttachSound, proteinDetachSound, deathSequence }
+         setMasterVolume, setChorusDepth, proteinAttachSound, proteinDetachSound, deathSequence }
   from './src/audio/synthesis.js';
 import { roughness, DEFAULT_TIMBRE } from './src/audio/consonance.js';
 import { Player, Cell, Clone } from './src/game/entities.js';
@@ -132,7 +132,9 @@ function init() {
     const pNote   = player.getActiveNote(committedCell.x, committedCell.y);
     const cNote   = committedCell.getActiveNote(player.x, player.y);
 
-    cellVoice.trigger(cNote);
+    const distToCell = Math.hypot(committedCell.x - player.x, committedCell.y - player.y);
+    const cellVolDb = Math.max(-35, -12 - (distToCell / 600) * 20);
+    cellVoice.trigger(cNote, cellVolDb);
     playerVoice.setFreq(pNote);
 
     state.roughness         = roughness([pNote], [cNote], DEFAULT_TIMBRE);
@@ -142,6 +144,7 @@ function init() {
     state.nearestCellNote   = nearest ? nearest.getActiveNote(player.x, player.y) : cNote;
     state.voiceCount        = voiceCount();
     setMasterVolume(getBPM());
+    setChorusDepth(Math.min(1, clones.length / 20)); // full width at 20 clones (160 BPM ceiling)
 
     // Trigger the 2 nearest clones as ambient pitched voices
     const nearClones = [...clones]
@@ -199,12 +202,13 @@ function loop(ts) {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.restore();
     if (deathFade >= 0.95) {
-      const avgBpm = gameTime > 0 ? Math.round(bpmAccum / gameTime) : 0;
+      const avgBpm = gameTime > 0 ? bpmAccum / gameTime : BASE_BPM;
+      const avgViralLoad = Math.max(0, Math.round((avgBpm - BASE_BPM) / BPM_PER_CLONE));
       ctx.save();
       ctx.font = '26px monospace';
       ctx.fillStyle = '#888';
       ctx.textAlign = 'center';
-      ctx.fillText(`avg BPM  ${avgBpm}`, canvas.width / 2, canvas.height / 2 - 18);
+      ctx.fillText(`avg viral load  ${avgViralLoad}`, canvas.width / 2, canvas.height / 2 - 18);
       ctx.font = '15px monospace';
       ctx.fillStyle = '#444';
       ctx.fillText('click to restart', canvas.width / 2, canvas.height / 2 + 18);

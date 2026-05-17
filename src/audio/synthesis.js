@@ -16,12 +16,28 @@ function getReverb() {
   return _reverb;
 }
 
+// Chorus sits between the player synth and the reverb.
+// depth starts at 0 (dry) and is driven upward by clone count.
+let _chorus = null;
+function getChorus() {
+  if (!_chorus) {
+    _chorus = new Tone.Chorus({ frequency: 0.4, delayTime: 3.5, depth: 0, spread: 180 })
+      .connect(getReverb());
+    _chorus.start();
+  }
+  return _chorus;
+}
+
+export function setChorusDepth(depth) {
+  if (_chorus) _chorus.depth = depth;
+}
+
 // Sustained tone for the player's active note
 export function createPlayerVoice() {
   const synth = new Tone.Synth({
     oscillator: { type: 'triangle' },
     envelope: { attack: 0.08, decay: 0.1, sustain: 0.7, release: 0.6 },
-  }).connect(getReverb());
+  }).connect(getChorus());
   synth.volume.value = -18;
 
   let started = false;
@@ -57,7 +73,8 @@ export function createCellVoice() {
   synth.volume.value = -12;
 
   return {
-    trigger(hz) {
+    trigger(hz, volumeDb = -12) {
+      synth.volume.value = volumeDb;
       _voiceCount++;
       synth.triggerAttackRelease(hz, '4n'); // quarter-note hold lets decay complete
       setTimeout(() => { _voiceCount = Math.max(0, _voiceCount - 1); }, 700);

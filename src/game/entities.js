@@ -215,7 +215,7 @@ export class Clone {
     this.x = x; this.y = y;
     this.radius = 18;
     this.chord = chord.slice();
-    this.detuning = (Math.random() - 0.5) * 0.02; // ±1% — quasi-species microtonality
+    this.detuning = (Math.random() - 0.5) * 0.005786; // ±5 cents
     this.lifetime = CLONE_LIFETIME_S;
     this.angle = Math.random() * Math.PI * 2;
     const speed = 30 + Math.random() * 20;

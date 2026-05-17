@@ -33,11 +33,23 @@ export function drawCircle(ctx, x, y, r, color, alpha = 1, fill = false) {
 }
 
 export function drawPlayer(ctx, player, activeFreq) {
-  // Body
-  drawCircle(ctx, player.x, player.y, player.radius, '#4af', 0.7);
+  const dots = player.getDots();
 
-  // Dots
-  for (const dot of player.getDots()) {
+  // Body — triangle through the 3 chord-dot vertices
+  ctx.save();
+  ctx.globalAlpha = 0.7;
+  ctx.strokeStyle = '#4af';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(dots[0].x, dots[0].y);
+  ctx.lineTo(dots[1].x, dots[1].y);
+  ctx.lineTo(dots[2].x, dots[2].y);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.restore();
+
+  // Dots at each vertex
+  for (const dot of dots) {
     const isActive = dot.freq === activeFreq;
     ctx.save();
     ctx.globalAlpha = isActive ? 1 : 0.45;
@@ -68,6 +80,21 @@ export function drawCell(ctx, cell) {
   }
 }
 
+// Returns the point where a ray from (cx,cy) in direction (nx,ny) exits a convex polygon.
+function rayPolygonEdge(cx, cy, nx, ny, vertices) {
+  for (let i = 0; i < vertices.length; i++) {
+    const a = vertices[i], b = vertices[(i + 1) % vertices.length];
+    const ex = b.x - a.x, ey = b.y - a.y;
+    const dx = a.x - cx,  dy = a.y - cy;
+    const denom = nx * ey - ny * ex;
+    if (Math.abs(denom) < 1e-10) continue;
+    const t = (dx * ey - dy * ex) / denom;
+    const u = -(dy * nx - dx * ny) / denom;
+    if (t >= 0 && u >= 0 && u <= 1) return { x: cx + nx * t, y: cy + ny * t };
+  }
+  return { x: cx + nx * 30, y: cy + ny * 30 }; // fallback (should never trigger)
+}
+
 export function drawGlow(ctx, player, cell, roughness) {
   // Show glow for any rough value below 0.6; green = consonant, amber = dissonant-but-close
   const proximity = Math.max(0, (0.6 - roughness) / 0.6);
@@ -83,10 +110,10 @@ export function drawGlow(ctx, player, cell, roughness) {
   if (gap > 250) return;
 
   const nx = dx / dist, ny = dy / dist;
-  const x1 = player.x + nx * player.radius;
-  const y1 = player.y + ny * player.radius;
-  const x2 = cell.x   - nx * cell.radius;
-  const y2 = cell.y   - ny * cell.radius;
+  const p1  = rayPolygonEdge(player.x, player.y, nx, ny, player.getDots());
+  const x1  = p1.x, y1 = p1.y;
+  const x2  = cell.x - nx * cell.radius;
+  const y2  = cell.y - ny * cell.radius;
 
   // Colour shifts green as roughness drops below threshold
   const consonance = Math.max(0, (0.3 - roughness) / 0.3);
@@ -123,18 +150,18 @@ export function drawProtein(ctx, protein) {
 
 export function drawClone(ctx, clone) {
   ctx.save();
-  ctx.globalAlpha = clone.alpha * 0.6;
+  ctx.globalAlpha = clone.alpha * 0.35;
   ctx.strokeStyle = '#8af';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.arc(clone.x, clone.y, clone.radius, 0, Math.PI * 2);
+  for (let i = 0; i < 3; i++) {
+    const a = clone.angle + i * (Math.PI * 2 / 3);
+    const x = clone.x + Math.cos(a) * clone.radius;
+    const y = clone.y + Math.sin(a) * clone.radius;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.closePath();
   ctx.stroke();
-  const dx = Math.cos(clone.angle) * clone.radius;
-  const dy = Math.sin(clone.angle) * clone.radius;
-  ctx.fillStyle = '#adf';
-  ctx.beginPath();
-  ctx.arc(clone.x + dx, clone.y + dy, 3, 0, Math.PI * 2);
-  ctx.fill();
   ctx.restore();
 }
 
