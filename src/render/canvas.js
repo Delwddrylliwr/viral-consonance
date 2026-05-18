@@ -174,3 +174,116 @@ export function drawInfectionFlash(ctx, alpha) {
   ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   ctx.restore();
 }
+
+// Amorphous blob body with ghost triangles of ingested clones inside
+export function drawMacrophage(ctx, m, time) {
+  ctx.save();
+  ctx.translate(m.x, m.y);
+
+  const N = m.spokeOffsets.length;
+  const pts = m.spokeOffsets.map((off, i) => {
+    const a = (i / N) * Math.PI * 2;
+    const r = m.radius + off + Math.sin(time * 0.6 + i * 0.8) * 5;
+    return { x: Math.cos(a) * r, y: Math.sin(a) * r };
+  });
+  ctx.beginPath();
+  for (let i = 0; i < N; i++) {
+    const curr = pts[i], next = pts[(i + 1) % N];
+    const mx = (curr.x + next.x) / 2, my = (curr.y + next.y) / 2;
+    if (i === 0) ctx.moveTo(mx, my);
+    ctx.quadraticCurveTo(curr.x, curr.y, mx, my);
+  }
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(107, 142, 35, 0.55)';
+  ctx.fill();
+  ctx.strokeStyle = '#9acd32';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Ghost triangles of ingested clones
+  for (const c of m.capturedClones) {
+    ctx.save();
+    ctx.translate(c.rx, c.ry);
+    ctx.globalAlpha = 0.28;
+    ctx.beginPath();
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2;
+      if (i === 0) ctx.moveTo(Math.cos(a) * 6, Math.sin(a) * 6);
+      else ctx.lineTo(Math.cos(a) * 6, Math.sin(a) * 6);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = '#0ff';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+// Slowly rotating square — 4-note motif matches the regular cell polygon
+export function drawTCell(ctx, tc) {
+  ctx.save();
+  ctx.translate(tc.x, tc.y);
+  ctx.rotate(tc.angle);
+  const s = tc.radius;
+  ctx.beginPath();
+  ctx.rect(-s, -s, s * 2, s * 2);
+  ctx.strokeStyle = 'rgba(32, 178, 170, 0.8)';
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(32, 178, 170, 0.12)';
+  ctx.fill();
+  ctx.restore();
+}
+
+// Diamond-shaped seeking missile
+export function drawAntibody(ctx, ab) {
+  ctx.save();
+  ctx.translate(ab.x, ab.y);
+  const r = ab.radius;
+  ctx.beginPath();
+  ctx.moveTo(0, -r * 1.5);
+  ctx.lineTo(r, 0);
+  ctx.lineTo(0,  r * 1.5);
+  ctx.lineTo(-r, 0);
+  ctx.closePath();
+  ctx.fillStyle   = 'rgba(220, 80, 80, 0.7)';
+  ctx.strokeStyle = '#ff4444';
+  ctx.lineWidth = 1.5;
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+// Jittering star; glowing countdown arc when attached to a clone
+export function drawNeutrophil(ctx, n) {
+  ctx.save();
+  ctx.translate(n.x, n.y);
+
+  // Fuse countdown arc (unrotated, drawn before star rotation)
+  if (n.attached && n.fuseBeats > 0) {
+    ctx.beginPath();
+    ctx.arc(0, 0, n.radius + 5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (n.fuseBeats / 4), false);
+    ctx.strokeStyle = '#ff6600';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  }
+
+  ctx.rotate(n.jitterAngle);
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a  = (i / 6) * Math.PI * 2;
+    const rr = i % 2 === 0 ? n.radius : n.radius * 0.45;
+    if (i === 0) ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
+    else ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+  }
+  ctx.closePath();
+  ctx.fillStyle   = 'rgba(255, 220, 50, 0.65)';
+  ctx.strokeStyle = '#ffdd22';
+  ctx.lineWidth   = 1.5;
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.restore();
+}

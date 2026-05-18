@@ -24,46 +24,42 @@ export class Player {
     this.x = x;
     this.y = y;
     this.radius = 30;
-    this.speed  = 200;
+    this.accel  = 700;  // px/s² — snappy acceleration
+    this.drag   = 3.5;  // exponential decay rate; terminal speed ≈ 200 px/s under input
     this.baseChord = [...PLAYER_CHORD];
     this.chord     = [...PLAYER_CHORD];
     this.rotation      = 0;
     this.rotationSpeed = Math.PI / 4;
     this.vx = 0; this.vy = 0;
     this.velHistory = [];
-    this.knockbackX = 0;
-    this.knockbackY = 0;
   }
 
   update(dt, input, now) {
-    let dx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
-    let dy = (input.down  ? 1 : 0) - (input.up   ? 1 : 0);
-    const len = Math.hypot(dx, dy);
-    if (len > 0) { dx /= len; dy /= len; }
-    this.vx = dx * this.speed;
-    this.vy = dy * this.speed;
-    this.velHistory.push({ vx: this.vx, vy: this.vy, t: now });
-    this.velHistory = this.velHistory.filter(e => now - e.t < 0.3);
-
-    // Knockback decays with ~120 ms half-life
-    const decay = Math.pow(0.5, dt / 0.12);
-    this.knockbackX *= decay;
-    this.knockbackY *= decay;
-    if (Math.hypot(this.knockbackX, this.knockbackY) < 1) {
-      this.knockbackX = this.knockbackY = 0;
+    const ax = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+    const ay = (input.down  ? 1 : 0) - (input.up   ? 1 : 0);
+    const len = Math.hypot(ax, ay);
+    if (len > 0) {
+      this.vx += (ax / len) * this.accel * dt;
+      this.vy += (ay / len) * this.accel * dt;
     }
-
-    this.x += (this.vx + this.knockbackX) * dt;
-    this.y += (this.vy + this.knockbackY) * dt;
+    // Exponential drag — natural terminal velocity without a hard clamp.
+    // Bounce impulses from contact.js overshoot this and decay naturally.
+    const dragFactor = Math.exp(-this.drag * dt);
+    this.vx *= dragFactor;
+    this.vy *= dragFactor;
+    this.velHistory.push({ vx: this.vx, vy: this.vy, t: now });
+    this.velHistory = this.velHistory.filter(e => now - e.t < 0.45);
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
     this.rotation += this.rotationSpeed * dt;
   }
 
   detectShake(now) {
-    const recent = this.velHistory.filter(e => now - e.t < 0.2);
+    const recent = this.velHistory.filter(e => now - e.t < 0.4);
     if (recent.length < 2) return false;
     const a = recent[0], b = recent[recent.length - 1];
     const ma = Math.hypot(a.vx, a.vy), mb = Math.hypot(b.vx, b.vy);
-    if (ma === 0 || mb === 0) return false;
+    if (ma < 50 || mb < 50) return false;
     return (a.vx * b.vx + a.vy * b.vy) < -0.3 * ma * mb;
   }
 
@@ -223,6 +219,7 @@ export class Clone {
     this.vx = Math.cos(dir) * speed;
     this.vy = Math.sin(dir) * speed;
     this.steerTimer = 3 + Math.random() * 3;
+    this.roughness = 0; // pre-computed each frame in main.js
   }
 
   get alive() { return this.lifetime > 0; }
@@ -248,5 +245,179 @@ export class Clone {
   activeNote() {
     const idx = Math.floor(Date.now() / 500) % this.chord.length;
     return this.chord[idx] * (1 + this.detuning);
+  }
+}
+
+export class Macrophage {
+  constructor(x, y) {
+    this.x = x; this.y = y;
+    this.radius = 26;
+    this.speed  = 52;
+    this.target = null;
+    this.retargetTimer = 0;
+    this.driftAngle = Math.random() * Math.PI * 2;
+    // Blob shape: 9 spoke offsets, randomised once, animated via elapsed time
+    this.spokeOffsets = Array.from({ length: 9 }, () => (Math.random() - 0.5) * 8);
+    // Ghost triangles of ingested clones stored as {rx, ry} relative to centre
+    this.capturedClones = [];
+  }
+
+  update(dt, clones, beatPhase) {
+    this.retargetTimer -= dt;
+    if (this.retargetTimer <= 0) {
+      // Prefer most-dissonant clone (rougher chord = more "foreign")
+      this.target = clones.length > 0
+        ? clones.reduce((b, c) => !b || (c.roughness || 0) > (b.roughness || 0) ? c : b, null)
+        : null;
+      this.retargetTimer = 1.6 + Math.random() * 0.4;
+    }
+
+    if (this.target && clones.includes(this.target)) {
+      const dx = this.target.x - this.x;
+      const dy = this.target.y - this.y;
+      const d  = Math.hypot(dx, dy) || 1;
+      // On beat (beatPhase < 0.2): seek directly. Off-beat: orbit laterally.
+      const onBeat     = beatPhase < 0.2;
+      const lateralAmt = onBeat ? 0 : Math.sin(Date.now() / 550) * 38;
+      const perp       = { x: -dy / d, y: dx / d };
+      this.x += (dx / d * this.speed + perp.x * lateralAmt) * dt;
+      this.y += (dy / d * this.speed + perp.y * lateralAmt) * dt;
+    } else {
+      this.target = null;
+      this.driftAngle += (Math.random() - 0.5) * 0.4;
+      this.x += Math.cos(this.driftAngle) * 18 * dt;
+      this.y += Math.sin(this.driftAngle) * 18 * dt;
+    }
+  }
+
+  ingest(clone) {
+    const angle = Math.random() * Math.PI * 2;
+    const r     = Math.random() * this.radius * 0.55;
+    this.capturedClones.push({ rx: Math.cos(angle) * r, ry: Math.sin(angle) * r });
+    this.target = null;
+    this.retargetTimer = 0;
+  }
+}
+
+export class TCell {
+  constructor(x, y) {
+    this.x = x; this.y = y;
+    this.radius = 22;
+    this.speed  = 75;
+    this.angle  = 0; // slow rotation for square rendering
+    this.scanTimer = 0;
+    this.dissonanceTarget = null;
+    this.escalationCooldown = 0;
+  }
+
+  update(dt, clones) {
+    this.angle += dt * 0.4;
+    this.escalationCooldown = Math.max(0, this.escalationCooldown - dt);
+    this.scanTimer -= dt;
+    if (this.scanTimer <= 0) {
+      const candidates = clones.filter(c => (c.roughness || 0) > 0.35);
+      this.dissonanceTarget = candidates.length > 0
+        ? candidates.reduce((b, c) =>
+            !b || (c.roughness || 0) > (b.roughness || 0) ? c : b, null)
+        : null;
+      this.scanTimer = 1.2;
+    }
+
+    if (this.dissonanceTarget && clones.includes(this.dissonanceTarget)) {
+      const dx = this.dissonanceTarget.x - this.x;
+      const dy = this.dissonanceTarget.y - this.y;
+      const d  = Math.hypot(dx, dy) || 1;
+      // Waltz-like lateral wobble while approaching
+      const perp   = { x: -dy / d, y: dx / d };
+      const wobble = Math.sin(Date.now() / 380) * 35;
+      this.x += (dx / d * this.speed + perp.x * wobble) * dt;
+      this.y += (dy / d * this.speed + perp.y * wobble) * dt;
+    }
+  }
+}
+
+export class Antibody {
+  constructor(x, y, targetNoteIdx) {
+    this.x = x; this.y = y;
+    this.radius = 11;
+    this.targetNoteIdx = targetNoteIdx;
+    this.attached      = false;
+    this.attachAngle   = 0;
+    this.vx = 0; this.vy = 0;
+    this.maxSpeed    = 160;  // px/s — player terminal speed (~200) keeps them ahead
+    this.accel       = 280;  // px/s² toward player
+    this.maxTurnRate = Math.PI * 1.1; // rad/s — limited turning makes them dodgeable
+  }
+
+  update(dt, player) {
+    if (this.attached) {
+      this.attachAngle += dt * 1.4;
+      this.x = player.x + Math.cos(this.attachAngle) * (player.radius + 18);
+      this.y = player.y + Math.sin(this.attachAngle) * (player.radius + 18);
+      return;
+    }
+    const dx = player.x - this.x, dy = player.y - this.y;
+    const desiredAngle = Math.atan2(dy, dx);
+    const currentAngle = (this.vx === 0 && this.vy === 0)
+      ? desiredAngle
+      : Math.atan2(this.vy, this.vx);
+    let delta = desiredAngle - currentAngle;
+    while (delta >  Math.PI) delta -= Math.PI * 2;
+    while (delta < -Math.PI) delta += Math.PI * 2;
+    const maxDelta = this.maxTurnRate * dt;
+    const newAngle = currentAngle + Math.max(-maxDelta, Math.min(maxDelta, delta));
+    this.vx += Math.cos(newAngle) * this.accel * dt;
+    this.vy += Math.sin(newAngle) * this.accel * dt;
+    const spd = Math.hypot(this.vx, this.vy);
+    if (spd > this.maxSpeed) {
+      this.vx = this.vx / spd * this.maxSpeed;
+      this.vy = this.vy / spd * this.maxSpeed;
+    }
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+  }
+}
+
+export class Neutrophil {
+  constructor(x, y) {
+    this.x = x; this.y = y;
+    this.radius      = 13;
+    this.speed       = 145;
+    this.target      = null;
+    this.attached    = false;
+    this.fuseBeats   = 0;
+    this.dead        = false;
+    this.jitterAngle = Math.random() * Math.PI * 2;
+    this.jitterTimer = 0;
+  }
+
+  update(dt, clones) {
+    if (this.dead) return;
+    this.jitterTimer -= dt;
+    if (this.jitterTimer <= 0) {
+      this.jitterAngle += (Math.random() - 0.5) * 2.8;
+      this.jitterTimer = 0.08 + Math.random() * 0.12;
+    }
+    if (this.attached && this.target && clones.includes(this.target)) {
+      this.x = this.target.x;
+      this.y = this.target.y;
+      return;
+    }
+    this.attached = false; // target was removed
+    if (!this.target || !clones.includes(this.target)) {
+      this.target = clones.length > 0
+        ? clones.reduce((b, c) => {
+            const db = b ? Math.hypot(b.x - this.x, b.y - this.y) : Infinity;
+            const dc = Math.hypot(c.x - this.x, c.y - this.y);
+            return dc < db ? c : b;
+          }, null)
+        : null;
+    }
+    if (this.target) {
+      const dx = this.target.x - this.x, dy = this.target.y - this.y;
+      const d  = Math.hypot(dx, dy) || 1;
+      this.x += (dx / d * this.speed + Math.cos(this.jitterAngle) * 45) * dt;
+      this.y += (dy / d * this.speed + Math.sin(this.jitterAngle) * 45) * dt;
+    }
   }
 }

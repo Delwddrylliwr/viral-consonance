@@ -11,5 +11,8 @@ export const state = {
   cellCount: 0,
   proteinCount: 0,
   cloneCount: 0,
+  macrophageCount: 0,
+  tcellCount: 0,
+  immuneAlert: 0,
   dead: false,
 };
