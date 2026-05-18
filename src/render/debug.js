@@ -11,6 +11,9 @@ export function drawDebug(ctx, state) {
     `CELLS:     ${state.cellCount}`,
     `PROTEINS:  ${state.proteinCount}`,
     `CLONES:    ${state.cloneCount}`,
+    `MACROPHAG: ${state.macrophageCount}`,
+    `TCELLS:    ${state.tcellCount}`,
+    `ALERT:     ${state.immuneAlert.toFixed(2)}`,
   ];
 
   ctx.save();

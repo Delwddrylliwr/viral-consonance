@@ -7,8 +7,8 @@ export function checkContact(player, cell) {
   return dist < player.radius + cell.radius;
 }
 
-// Push player outside the cell and apply roughness-proportional knockback velocity.
-// r = 0 at threshold, up to 1 at maximum roughness → knockback 60–400 px/s.
+// Push player outside the cell and add a roughness-proportional velocity impulse.
+// r = 0 at threshold, up to 1 at maximum roughness → impulse 80–640 px/s.
 export function bouncePlayer(player, cell, r = 0.5) {
   const dx   = player.x - cell.x;
   const dy   = player.y - cell.y;
@@ -19,10 +19,12 @@ export function bouncePlayer(player, cell, r = 0.5) {
     player.x += nx * (overlap + 2);
     player.y += ny * (overlap + 2);
   }
-  const t     = Math.max(0, (r - INFECTION_THRESHOLD) / (1 - INFECTION_THRESHOLD));
-  const speed = 60 + t * 340;
-  player.knockbackX = nx * speed;
-  player.knockbackY = ny * speed;
+  const t       = Math.max(0, (r - INFECTION_THRESHOLD) / (1 - INFECTION_THRESHOLD));
+  const impulse = 80 + t * 560; // 80–640 px/s added to existing velocity
+  player.vx += nx * impulse;
+  player.vy += ny * impulse;
+  // Clear velocity history so the impulse doesn't immediately trigger protein shake-off
+  player.velHistory = [];
 }
 
 // Spawn a new cell. Pass type 0–2 explicitly, or -1 for random.

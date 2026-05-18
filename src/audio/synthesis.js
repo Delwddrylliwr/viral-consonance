@@ -168,3 +168,47 @@ export function dissonantStab() {
     poly.dispose();
   }, 500);
 }
+
+// Low thud when a macrophage consumes a clone
+export function playMacrophageConsume() {
+  const synth = new Tone.MembraneSynth({
+    pitchDecay: 0.06, octaves: 5,
+    envelope: { attack: 0.001, decay: 0.35, sustain: 0, release: 0.1 },
+  }).toDestination();
+  synth.volume.value = -26;
+  synth.triggerAttackRelease('G0', '4n');
+  setTimeout(() => synth.dispose(), 600);
+}
+
+// Tritone stab when an antibody latches onto the player
+export function playAntibodyAttach() {
+  const poly = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: 'sine' },
+    envelope: { attack: 0.01, decay: 0.3, sustain: 0, release: 0.1 },
+  }).toDestination();
+  poly.volume.value = -14;
+  poly.triggerAttackRelease(['C4', 'F#4'], '16n');
+  setTimeout(() => poly.dispose(), 600);
+}
+
+// Escalating tick as neutrophil fuse counts down (beatNum 1–4)
+export function playNeutrophilTick(beatNum) {
+  const synth = new Tone.Synth({
+    oscillator: { type: 'square' },
+    envelope: { attack: 0.001, decay: 0.08, sustain: 0, release: 0.04 },
+  }).toDestination();
+  synth.volume.value = -24 + beatNum * 3;
+  synth.triggerAttackRelease('G2', '32n');
+  setTimeout(() => synth.dispose(), 300);
+}
+
+// Burst of noise when neutrophil explodes
+export function playNeutrophilExplode() {
+  const noise = new Tone.NoiseSynth({
+    noise: { type: 'white' },
+    envelope: { attack: 0.001, decay: 0.18, sustain: 0, release: 0.08 },
+  }).toDestination();
+  noise.volume.value = -12;
+  noise.triggerAttackRelease('8n');
+  setTimeout(() => noise.dispose(), 500);
+}
