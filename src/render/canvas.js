@@ -237,10 +237,12 @@ export function drawTCell(ctx, tc) {
   ctx.restore();
 }
 
-// Diamond-shaped seeking missile
+// Diamond-shaped seeking missile — tip points in direction of travel
 export function drawAntibody(ctx, ab) {
   ctx.save();
   ctx.translate(ab.x, ab.y);
+  const spd = Math.hypot(ab.vx, ab.vy);
+  if (spd > 0.1) ctx.rotate(Math.atan2(ab.vy, ab.vx) + Math.PI / 2);
   const r = ab.radius;
   ctx.beginPath();
   ctx.moveTo(0, -r * 1.5);
@@ -272,9 +274,9 @@ export function drawNeutrophil(ctx, n) {
 
   ctx.rotate(n.jitterAngle);
   ctx.beginPath();
-  for (let i = 0; i < 6; i++) {
-    const a  = (i / 6) * Math.PI * 2;
-    const rr = i % 2 === 0 ? n.radius : n.radius * 0.45;
+  for (let i = 0; i < 10; i++) {
+    const a  = (i / 10) * Math.PI * 2 - Math.PI / 2;
+    const rr = i % 2 === 0 ? n.radius : n.radius * 0.4;
     if (i === 0) ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
     else ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
   }
