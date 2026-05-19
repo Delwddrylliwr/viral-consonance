@@ -204,7 +204,7 @@ function init() {
     const cNote   = committedCell.getActiveNote(player.x, player.y);
 
     const distToCell = Math.hypot(committedCell.x - player.x, committedCell.y - player.y);
-    const cellVolDb = Math.max(-35, -12 - (distToCell / 600) * 20);
+    const cellVolDb = Math.max(-35, -8 - 20 * Math.log10(1 + distToCell / 150));
     cellVoice.trigger(cNote, cellVolDb);
     playerVoice.setFreq(pNote);
 
