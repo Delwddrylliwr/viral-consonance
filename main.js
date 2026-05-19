@@ -356,7 +356,7 @@ function loop(ts) {
         cellDot:   { x: cActiveDot.x, y: cActiveDot.y },
         timer: 0.3,
       };
-      resolutionCadence();
+      resolutionCadence([pNote, cNote], player.chord);
       // Spawn clones: each of 3 slots succeeds with probability ∝ consonance
       const spawnProb = Math.max(0, 1 - r / INFECTION_THRESHOLD);
       for (let i = 0; i < MAX_CLONES_PER_INFECTION; i++) {
@@ -391,7 +391,7 @@ function loop(ts) {
       }, 650);
     } else {
       bouncePlayer(player, c, r);
-      dissonantStab();
+      dissonantStab(pNote, cNote);
       immuneAlertLevel = Math.min(1.0, immuneAlertLevel + 0.3);
       setTempo(Math.min(160, BASE_BPM + clones.length * BPM_PER_CLONE));
       setMasterVolume(getBPM());
