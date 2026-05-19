@@ -73,7 +73,8 @@ const ALERT_THRESHOLD_MACRO_PLAYER = 0.8;
 
 let player, cells, committedCell, proteins, clones, playerVoice, cellVoice, cloneVoice;
 let macrophages, tcells, antibodies, neutrophils, bcells;
-let antibodySpawnTimer = 15;
+let antibodySpawnTimer  = 15;
+let tcellRespawnTimer   = 0;
 let immuneAlertLevel = 0;
 let infectionFlash = 0;
 let letterBondFlash = { playerDot: { x: 0, y: 0 }, cellDot: { x: 0, y: 0 }, timer: 0 };
@@ -140,6 +141,7 @@ function init() {
   neutrophils        = [];
   bcells             = [];
   antibodySpawnTimer = 15;
+  tcellRespawnTimer  = 0;
   immuneAlertLevel   = 0;
   dead               = false;
   deathFade          = 0;
@@ -391,8 +393,9 @@ function loop(ts) {
   const playerDissonance = roughness(player.chord, PLAYER_CHORD, DEFAULT_TIMBRE);
   const attachedProteinCount = proteins.filter(p => p.attached).length;
 
-  // T-cell: always 1 present; orbits dissonant clones; escalates immune alert near them
-  if (tcells.length < 1) tcells.push(new TCell(...randomEdgePos()));
+  // T-cell: respawns after a delay (longer if last one was neutralised by player)
+  tcellRespawnTimer = Math.max(0, tcellRespawnTimer - dt);
+  if (tcells.length < 1 && tcellRespawnTimer <= 0) tcells.push(new TCell(...randomEdgePos()));
   tcells = tcells.filter(tc => Math.hypot(tc.x - player.x, tc.y - player.y) < 1500);
   const tcellMatchable = attachedProteinCount >= 3;
   for (const tc of tcells) {
@@ -413,13 +416,15 @@ function loop(ts) {
       if (roughness([pNote], [tNote], DEFAULT_TIMBRE) < INFECTION_THRESHOLD) {
         tcells = tcells.filter(t => t !== tc);
         immuneAlertLevel = Math.max(0, immuneAlertLevel - 0.3);
+        tcellRespawnTimer = 25; // 25 s delay before a new T-cell appears
         resolutionCadence();
         break;
       }
     }
   }
 
-  // Macrophage management: gated at ALERT_THRESHOLD_MACROPHAGE; scaled more aggressively with dissonance
+  // Macrophage management: remove exhausted macrophages first, then replenish based on alert
+  macrophages = macrophages.filter(m => !m.dead);
   const targetMacroCount = Math.min(MACROPHAGE_MAX,
     (immuneAlertLevel >= ALERT_THRESHOLD_MACROPHAGE ? MACROPHAGE_BASE : 0)
     + proteins.filter(p => p.attached).length

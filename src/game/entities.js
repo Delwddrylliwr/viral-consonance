@@ -264,6 +264,9 @@ export class Macrophage {
     this.targetingPlayer = false;
     this.eatingPlayer    = false;
     this.eatTimer        = 0;
+    this.consumeCount    = 0;
+    this.maxConsumes     = 4; // dies after eating this many clones
+    this.dead            = false;
   }
 
   update(dt, clones, beatPhase, player, playerDissonance) {
@@ -315,6 +318,8 @@ export class Macrophage {
     this.capturedClones.push({ rx: Math.cos(angle) * r, ry: Math.sin(angle) * r });
     this.target = null;
     this.retargetTimer = 0;
+    this.consumeCount++;
+    if (this.consumeCount >= this.maxConsumes) this.dead = true;
   }
 }
 
