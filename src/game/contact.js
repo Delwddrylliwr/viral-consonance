@@ -27,11 +27,20 @@ export function bouncePlayer(player, cell, r = 0.5) {
   player.velHistory = [];
 }
 
-// Spawn a new cell. Pass type 0–2 explicitly, or -1 for random.
+// Weighted cell type: type 0 (easy, consonant at normal tonality) most common;
+// type 2 (hard, consonant when chord is complement-shifted) rarest.
+function randomCellType() {
+  const r = Math.random();
+  if (r < 0.55) return 0;
+  if (r < 0.85) return 1;
+  return 2;
+}
+
+// Spawn a new cell. Pass type 0–2 explicitly, or -1 for weighted random.
 export function spawnCell(playerX, playerY, minDist = 200, maxDist = 380, type = -1) {
   const angle    = Math.random() * Math.PI * 2;
   const dist     = minDist + Math.random() * (maxDist - minDist);
-  const cellType = type < 0 ? Math.floor(Math.random() * 3) : type;
+  const cellType = type < 0 ? randomCellType() : type;
   return new Cell(
     playerX + Math.cos(angle) * dist,
     playerY + Math.sin(angle) * dist,

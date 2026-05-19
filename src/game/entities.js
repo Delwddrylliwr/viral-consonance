@@ -261,19 +261,37 @@ export class Macrophage {
     this.spokeOffsets = Array.from({ length: 9 }, () => (Math.random() - 0.5) * 8);
     // Ghost triangles of ingested clones stored as {rx, ry} relative to centre
     this.capturedClones = [];
+    this.targetingPlayer = false;
+    this.eatingPlayer    = false;
+    this.eatTimer        = 0;
   }
 
-  update(dt, clones, beatPhase) {
+  update(dt, clones, beatPhase, player, playerDissonance) {
     this.retargetTimer -= dt;
     if (this.retargetTimer <= 0) {
-      // Prefer most-dissonant clone (rougher chord = more "foreign")
-      this.target = clones.length > 0
-        ? clones.reduce((b, c) => !b || (c.roughness || 0) > (b.roughness || 0) ? c : b, null)
-        : null;
+      // At high player dissonance, occasionally target the player instead of a clone
+      if (player && (playerDissonance || 0) >= 0.5 && Math.random() < 0.4) {
+        this.targetingPlayer = true;
+        this.target = null;
+      } else {
+        this.targetingPlayer = false;
+        // Prefer most-dissonant clone (rougher chord = more "foreign")
+        this.target = clones.length > 0
+          ? clones.reduce((b, c) => !b || (c.roughness || 0) > (b.roughness || 0) ? c : b, null)
+          : null;
+      }
       this.retargetTimer = 1.6 + Math.random() * 0.4;
     }
 
-    if (this.target && clones.includes(this.target)) {
+    if (this.targetingPlayer && player) {
+      const dx = player.x - this.x, dy = player.y - this.y;
+      const d  = Math.hypot(dx, dy) || 1;
+      const onBeat     = beatPhase < 0.2;
+      const lateralAmt = onBeat ? 0 : Math.sin(Date.now() / 550) * 38;
+      const perp       = { x: -dy / d, y: dx / d };
+      this.x += (dx / d * this.speed + perp.x * lateralAmt) * dt;
+      this.y += (dy / d * this.speed + perp.y * lateralAmt) * dt;
+    } else if (this.target && clones.includes(this.target)) {
       const dx = this.target.x - this.x;
       const dy = this.target.y - this.y;
       const d  = Math.hypot(dx, dy) || 1;
@@ -309,6 +327,32 @@ export class TCell {
     this.scanTimer = 0;
     this.dissonanceTarget = null;
     this.escalationCooldown = 0;
+    // Motif: complement-shifted player notes — consonant only when player has all 3 proteins
+    this.motif = [277.18, 311.13, 415.30, 554.37]; // C#4, Eb4, G#4, C#5
+  }
+
+  getDots() {
+    // 4 notes at the square corners: radius * √2 from centre at ±45° from each axis
+    const cornerDist = this.radius * Math.SQRT2;
+    return this.motif.map((freq, i) => {
+      const angle = this.angle + (i * Math.PI / 2) + Math.PI / 4;
+      return {
+        x: this.x + Math.cos(angle) * cornerDist,
+        y: this.y + Math.sin(angle) * cornerDist,
+        freq,
+        angle,
+      };
+    });
+  }
+
+  getActiveNote(px, py) {
+    const toward = Math.atan2(py - this.y, px - this.x);
+    let best = null, bestDiff = Infinity;
+    for (const dot of this.getDots()) {
+      const diff = Math.abs(angleDiff(dot.angle, toward));
+      if (diff < bestDiff) { bestDiff = diff; best = dot; }
+    }
+    return best.freq;
   }
 
   update(dt, clones) {
@@ -328,11 +372,18 @@ export class TCell {
       const dx = this.dissonanceTarget.x - this.x;
       const dy = this.dissonanceTarget.y - this.y;
       const d  = Math.hypot(dx, dy) || 1;
-      // Waltz-like lateral wobble while approaching
-      const perp   = { x: -dy / d, y: dx / d };
-      const wobble = Math.sin(Date.now() / 380) * 35;
-      this.x += (dx / d * this.speed + perp.x * wobble) * dt;
-      this.y += (dy / d * this.speed + perp.y * wobble) * dt;
+      const orbitRadius = 90;
+      if (d > orbitRadius * 1.8) {
+        // Approach phase
+        this.x += dx / d * this.speed * dt;
+        this.y += dy / d * this.speed * dt;
+      } else {
+        // Orbit phase: circle the dissonant clone
+        const perp            = { x: -dy / d, y: dx / d };
+        const radialCorrection = (d - orbitRadius) / orbitRadius;
+        this.x += (perp.x * this.speed + dx / d * this.speed * 0.4 * radialCorrection) * dt;
+        this.y += (perp.y * this.speed + dy / d * this.speed * 0.4 * radialCorrection) * dt;
+      }
     }
   }
 }
@@ -347,9 +398,9 @@ export class Antibody {
     this.attached      = false;
     this.attachAngle   = 0;
     this.vx = 0; this.vy = 0;
-    this.maxSpeed    = 160;  // px/s — player terminal speed (~200) keeps them ahead
-    this.accel       = 280;  // px/s² toward player
-    this.maxTurnRate = Math.PI * 1.1; // rad/s — limited turning makes them dodgeable
+    this.maxSpeed    = 200;  // px/s — faster pursuit
+    this.accel       = 380;  // px/s² toward player
+    this.maxTurnRate = Math.PI * 1.6; // rad/s — tighter tracking
   }
 
   update(dt, player) {
@@ -392,6 +443,9 @@ export class Neutrophil {
     this.dead        = false;
     this.jitterAngle = Math.random() * Math.PI * 2;
     this.jitterTimer = 0;
+    this.targetingPlayer = false;
+    this.playerFuseBeats = 0;
+    this.attachedToPlayer = false;
   }
 
   update(dt, clones) {
@@ -416,11 +470,86 @@ export class Neutrophil {
           }, null)
         : null;
     }
-    if (this.target) {
+    if (this.targetingPlayer && this.playerTarget) {
+      const dx = this.playerTarget.x - this.x, dy = this.playerTarget.y - this.y;
+      const d  = Math.hypot(dx, dy) || 1;
+      this.x += (dx / d * this.speed + Math.cos(this.jitterAngle) * 45) * dt;
+      this.y += (dy / d * this.speed + Math.sin(this.jitterAngle) * 45) * dt;
+    } else if (this.target) {
       const dx = this.target.x - this.x, dy = this.target.y - this.y;
       const d  = Math.hypot(dx, dy) || 1;
       this.x += (dx / d * this.speed + Math.cos(this.jitterAngle) * 45) * dt;
       this.y += (dy / d * this.speed + Math.sin(this.jitterAngle) * 45) * dt;
     }
+  }
+}
+
+export class BCell {
+  constructor(x, y) {
+    this.x = x; this.y = y;
+    this.radius      = 32;
+    this.rotation    = Math.random() * Math.PI * 2;
+    this.rotationSpeed = (2 * Math.PI) / 5.6;
+    this.active      = true;
+    this.flashTimer  = 0;
+    this.launchTimer = 8 + Math.random() * 6; // time until first antibody launch
+    this.speed       = 60;   // slow enough to be catchable
+    this.fleeSpeed   = 95;   // faster when player is close
+    this.color       = '#a3f';
+    // 8-note motif at octagon corners (based on antibody freq harmonics)
+    this.motif = [369.99, 392.00, 415.30, 440.00, 466.16, 493.88, 523.25, 554.37];
+  }
+
+  getDots() {
+    return this.motif.map((freq, i) => {
+      const angle = this.rotation + i * (Math.PI / 4);
+      return {
+        x: this.x + Math.cos(angle) * this.radius,
+        y: this.y + Math.sin(angle) * this.radius,
+        freq,
+        angle,
+      };
+    });
+  }
+
+  getActiveNote(px, py) {
+    const toward = Math.atan2(py - this.y, px - this.x);
+    let best = null, bestDiff = Infinity;
+    for (const dot of this.getDots()) {
+      const diff = Math.abs(angleDiff(dot.angle, toward));
+      if (diff < bestDiff) { bestDiff = diff; best = dot; }
+    }
+    return best.freq;
+  }
+
+  update(dt, player, screenHalfW, screenHalfH) {
+    this.rotation += this.rotationSpeed * dt;
+    this.launchTimer = Math.max(0, this.launchTimer - dt);
+    if (this.flashTimer > 0) this.flashTimer = Math.max(0, this.flashTimer - dt);
+
+    const toPlayerX = player.x - this.x;
+    const toPlayerY = player.y - this.y;
+    const playerDist = Math.hypot(toPlayerX, toPlayerY) || 1;
+
+    // Flee away from player; also drift toward the screen perimeter
+    const spd = playerDist < 300 ? this.fleeSpeed : this.speed;
+
+    // Flee component: directly away from player
+    const fleeX = -(toPlayerX / playerDist);
+    const fleeY = -(toPlayerY / playerDist);
+
+    // Edge-pull: nudge toward the nearest off-screen direction relative to player
+    // (the direction from player that puts this B cell furthest off-screen)
+    const relX = this.x - player.x;
+    const relY = this.y - player.y;
+    const edgeDirX = relX / (Math.abs(relX) || 1);
+    const edgeDirY = relY / (Math.abs(relY) || 1);
+    // Blend: mostly flee, partly hug edge
+    const moveX = fleeX * 0.7 + edgeDirX * 0.3;
+    const moveY = fleeY * 0.7 + edgeDirY * 0.3;
+    const mLen  = Math.hypot(moveX, moveY) || 1;
+
+    this.x += (moveX / mLen) * spd * dt;
+    this.y += (moveY / mLen) * spd * dt;
   }
 }

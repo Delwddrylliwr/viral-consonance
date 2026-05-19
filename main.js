@@ -1,5 +1,5 @@
 import { initCanvas, clear, drawPlayer, drawCell, drawGlow, drawInfectionFlash, drawProtein, drawClone,
-         drawMacrophage, drawTCell, drawAntibody, drawNeutrophil, drawLetterBond } from './src/render/canvas.js';
+         drawMacrophage, drawTCell, drawAntibody, drawNeutrophil, drawLetterBond, drawBCell } from './src/render/canvas.js';
 import { drawDebug } from './src/render/debug.js';
 import { DEBUG, state } from './src/game/state.js';
 import { startTransport, onBeat, getBPM, setTempo } from './src/audio/transport.js';
@@ -10,7 +10,7 @@ import { createPlayerVoice, createCellVoice, createCloneVoice, voiceCount,
   from './src/audio/synthesis.js';
 import { roughness, DEFAULT_TIMBRE } from './src/audio/consonance.js';
 import { PLAYER_CHORD } from './src/audio/scale.js';
-import { Player, Cell, Clone, Macrophage, TCell, Antibody, Neutrophil } from './src/game/entities.js';
+import { Player, Cell, Clone, Macrophage, TCell, Antibody, Neutrophil, BCell } from './src/game/entities.js';
 import { checkContact, bouncePlayer, spawnCell, INFECTION_THRESHOLD,
          checkContactProtein, spawnProtein }
   from './src/game/contact.js';
@@ -63,8 +63,16 @@ const MACROPHAGE_MAX  = 7;
 // Tritone substitutions for player chord notes C4, E4, G4 (F#4, Bb4, C#5)
 const ANTIBODY_FREQS = [369.99, 466.16, 554.37];
 
+// Dissonance thresholds for escalating immune response
+const ALERT_THRESHOLD_NEUTROPHIL   = 0.2;
+const ALERT_THRESHOLD_MACROPHAGE   = 0.3;
+const ALERT_THRESHOLD_ANTIBODY     = 0.45;
+const ALERT_THRESHOLD_BCELL        = 0.6;
+const ALERT_THRESHOLD_NPHIL_PLAYER = 0.7;
+const ALERT_THRESHOLD_MACRO_PLAYER = 0.8;
+
 let player, cells, committedCell, proteins, clones, playerVoice, cellVoice, cloneVoice;
-let macrophages, tcells, antibodies, neutrophils;
+let macrophages, tcells, antibodies, neutrophils, bcells;
 let antibodySpawnTimer = 15;
 let immuneAlertLevel = 0;
 let infectionFlash = 0;
@@ -131,6 +139,7 @@ function init() {
   tcells             = [];
   antibodies         = [];
   neutrophils        = [];
+  bcells             = [];
   antibodySpawnTimer = 15;
   immuneAlertLevel   = 0;
   dead               = false;
@@ -156,18 +165,28 @@ function init() {
     state.tcellCount     = tcells.length;
     state.immuneAlert    = immuneAlertLevel;
 
-    // Neutrophil fuse countdown — fires on each beat while attached to a clone
-    for (const n of neutrophils.filter(n => n.attached && !n.dead)) {
-      n.fuseBeats++;
-      playNeutrophilTick(n.fuseBeats);
-      if (n.fuseBeats >= 4) {
-        const idx = clones.indexOf(n.target);
-        if (idx !== -1) {
-          clones.splice(idx, 1);
-          setTempo(Math.min(160, BASE_BPM + clones.length * BPM_PER_CLONE));
+    // Neutrophil fuse countdown — fires on each beat while attached to a clone or player
+    for (const n of neutrophils.filter(n => (n.attached || n.attachedToPlayer) && !n.dead)) {
+      if (n.attachedToPlayer) {
+        n.playerFuseBeats++;
+        playNeutrophilTick(n.playerFuseBeats);
+        if (n.playerFuseBeats >= 3 && !dead) {
+          n.dead = true;
+          playNeutrophilExplode();
+          triggerDeath();
         }
-        n.dead = true;
-        playNeutrophilExplode();
+      } else {
+        n.fuseBeats++;
+        playNeutrophilTick(n.fuseBeats);
+        if (n.fuseBeats >= 4) {
+          const idx = clones.indexOf(n.target);
+          if (idx !== -1) {
+            clones.splice(idx, 1);
+            setTempo(Math.min(160, BASE_BPM + clones.length * BPM_PER_CLONE));
+          }
+          n.dead = true;
+          playNeutrophilExplode();
+        }
       }
     }
     neutrophils = neutrophils.filter(n => !n.dead);
@@ -369,9 +388,14 @@ function loop(ts) {
   // Immune system — immune alert decays over time
   immuneAlertLevel = Math.max(0, immuneAlertLevel - 0.08 * dt);
 
-  // T-cell: always 1 present; escalates immune alert near dissonant clones
+  // Player dissonance: how far the player's current chord has drifted from the base (due to proteins/antibodies)
+  const playerDissonance = roughness(player.chord, PLAYER_CHORD, DEFAULT_TIMBRE);
+  const attachedProteinCount = proteins.filter(p => p.attached).length;
+
+  // T-cell: always 1 present; orbits dissonant clones; escalates immune alert near them
   if (tcells.length < 1) tcells.push(new TCell(...randomEdgePos()));
   tcells = tcells.filter(tc => Math.hypot(tc.x - player.x, tc.y - player.y) < 1500);
+  const tcellMatchable = attachedProteinCount >= 3;
   for (const tc of tcells) {
     tc.update(dt, clones);
     for (const c of clones) {
@@ -383,45 +407,133 @@ function loop(ts) {
         break;
       }
     }
-  }
-
-  // Macrophage management: count driven by attached proteins + immune alert (after T-cell escalation)
-  const targetMacroCount = Math.min(MACROPHAGE_MAX,
-    MACROPHAGE_BASE + proteins.filter(p => p.attached).length + Math.round(immuneAlertLevel * 3));
-  while (macrophages.length < targetMacroCount) macrophages.push(new Macrophage(...randomEdgePos()));
-  if (macrophages.length > MACROPHAGE_MAX) macrophages.length = MACROPHAGE_MAX;
-
-  for (const m of macrophages) {
-    m.update(dt, clones, beatPhase);
-    for (let i = clones.length - 1; i >= 0; i--) {
-      if (Math.hypot(m.x - clones[i].x, m.y - clones[i].y) < m.radius + clones[i].radius) {
-        m.ingest(clones[i]);
-        clones.splice(i, 1);
-        setTempo(Math.min(160, BASE_BPM + clones.length * BPM_PER_CLONE));
-        playMacrophageConsume();
+    // Player can neutralise T-cell only when maximally loaded with all 3 complement proteins
+    if (tcellMatchable && Math.hypot(tc.x - player.x, tc.y - player.y) < tc.radius + player.radius) {
+      const pNote = player.getActiveNote(tc.x, tc.y);
+      const tNote = tc.getActiveNote(player.x, player.y);
+      if (roughness([pNote], [tNote], DEFAULT_TIMBRE) < INFECTION_THRESHOLD) {
+        tcells = tcells.filter(t => t !== tc);
+        immuneAlertLevel = Math.max(0, immuneAlertLevel - 0.3);
+        resolutionCadence();
         break;
       }
     }
   }
 
-  // Neutrophil: 1 present while clones exist; attaches and explodes after 4 beats
-  neutrophils = neutrophils.filter(n => !n.dead);
-  if (neutrophils.length < 1 && clones.length > 0) neutrophils.push(new Neutrophil(...randomEdgePos()));
-  for (const n of neutrophils) {
-    n.update(dt, clones);
-    if (!n.attached && n.target && clones.includes(n.target)
-        && Math.hypot(n.x - n.target.x, n.y - n.target.y) < n.radius + n.target.radius) {
-      n.attached = true;
+  // Macrophage management: gated at ALERT_THRESHOLD_MACROPHAGE; scaled more aggressively with dissonance
+  const targetMacroCount = Math.min(MACROPHAGE_MAX,
+    (immuneAlertLevel >= ALERT_THRESHOLD_MACROPHAGE ? MACROPHAGE_BASE : 0)
+    + proteins.filter(p => p.attached).length
+    + Math.round(immuneAlertLevel * 5));
+  while (macrophages.length < targetMacroCount) macrophages.push(new Macrophage(...randomEdgePos()));
+  if (macrophages.length > MACROPHAGE_MAX) macrophages.length = MACROPHAGE_MAX;
+
+  for (const m of macrophages) {
+    // Only allow player-targeting at high alert
+    const macroPlayerDissonance = immuneAlertLevel >= ALERT_THRESHOLD_MACRO_PLAYER ? playerDissonance : 0;
+    m.update(dt, clones, beatPhase, player, macroPlayerDissonance);
+
+    // Macrophage eats player: contact starts a 2s eat window; shake to escape
+    if (m.targetingPlayer && !m.eatingPlayer
+        && Math.hypot(m.x - player.x, m.y - player.y) < m.radius + player.radius) {
+      m.eatingPlayer = true;
+      m.eatTimer = 2.0;
+    }
+    if (m.eatingPlayer) {
+      m.eatTimer -= dt;
+      if (playerShook) {
+        m.eatingPlayer = false;
+        m.targetingPlayer = false;
+      } else if (m.eatTimer <= 0 && !dead) {
+        triggerDeath();
+      }
+    }
+
+    // Macrophage ingests clones
+    if (!m.eatingPlayer) {
+      for (let i = clones.length - 1; i >= 0; i--) {
+        if (Math.hypot(m.x - clones[i].x, m.y - clones[i].y) < m.radius + clones[i].radius) {
+          m.ingest(clones[i]);
+          clones.splice(i, 1);
+          setTempo(Math.min(160, BASE_BPM + clones.length * BPM_PER_CLONE));
+          playMacrophageConsume();
+          break;
+        }
+      }
     }
   }
 
-  // Antibodies: spawn on timer, max 2 in flight, home toward player as seeking missiles
-  antibodySpawnTimer -= dt;
-  if (antibodySpawnTimer <= 0 && antibodies.filter(ab => !ab.attached).length < 2) {
-    const noteIdx = Math.floor(Math.random() * 3);
-    antibodies.push(new Antibody(...randomEdgePos(), noteIdx, ANTIBODY_FREQS[noteIdx]));
-    antibodySpawnTimer = 12 + Math.random() * 6;
+  // Neutrophil: gated at ALERT_THRESHOLD_NEUTROPHIL; at high alert also targets player
+  neutrophils = neutrophils.filter(n => !n.dead);
+  if (neutrophils.length < 1 && clones.length > 0 && immuneAlertLevel >= ALERT_THRESHOLD_NEUTROPHIL) {
+    neutrophils.push(new Neutrophil(...randomEdgePos()));
   }
+  for (const n of neutrophils) {
+    // At high alert: switch to targeting player
+    if (immuneAlertLevel >= ALERT_THRESHOLD_NPHIL_PLAYER && !n.attached && clones.length === 0) {
+      n.targetingPlayer = true;
+      n.playerTarget = player;
+    } else {
+      n.targetingPlayer = false;
+      n.playerTarget    = null;
+    }
+    n.update(dt, clones);
+    if (!n.attached && !n.targetingPlayer && n.target && clones.includes(n.target)
+        && Math.hypot(n.x - n.target.x, n.y - n.target.y) < n.radius + n.target.radius) {
+      n.attached = true;
+    }
+    // Neutrophil attacks player: contact starts a fuse; shake to escape
+    if (n.targetingPlayer && !n.attachedToPlayer
+        && Math.hypot(n.x - player.x, n.y - player.y) < n.radius + player.radius) {
+      n.attachedToPlayer = true;
+      n.playerFuseBeats  = 0;
+    }
+    if (n.attachedToPlayer) {
+      if (playerShook) {
+        n.attachedToPlayer = false;
+        n.targetingPlayer  = false;
+      }
+    }
+  }
+
+  // B-cell management: persistent off-screen launchers gated at ALERT_THRESHOLD_BCELL
+  if (bcells.filter(b => b.active).length < 1 && immuneAlertLevel >= ALERT_THRESHOLD_BCELL) {
+    bcells.push(new BCell(...randomEdgePos()));
+  }
+  bcells = bcells.filter(b => b.active);
+  for (const bc of bcells) {
+    bc.update(dt, player, canvas.width / 2, canvas.height / 2);
+    // Launch antibodies from this B-cell (replaces freestanding antibody timer)
+    if (bc.launchTimer <= 0 && immuneAlertLevel >= ALERT_THRESHOLD_ANTIBODY
+        && antibodies.filter(ab => !ab.attached).length < 2) {
+      const noteIdx = Math.floor(Math.random() * 3);
+      antibodies.push(new Antibody(bc.x, bc.y, noteIdx, ANTIBODY_FREQS[noteIdx]));
+      bc.launchTimer = 12 + Math.random() * 6;
+    }
+    // Player can neutralise B-cell by matching a corner note
+    if (Math.hypot(bc.x - player.x, bc.y - player.y) < bc.radius + player.radius) {
+      const pNote = player.getActiveNote(bc.x, bc.y);
+      const bNote = bc.getActiveNote(player.x, player.y);
+      if (roughness([pNote], [bNote], DEFAULT_TIMBRE) < INFECTION_THRESHOLD) {
+        bc.active = false;
+        bc.flashTimer = 0.5;
+        resolutionCadence();
+      }
+    }
+  }
+
+  // Antibodies: launched by B-cells above; also keep legacy timer as fallback when no B-cell exists
+  if (bcells.length === 0 && immuneAlertLevel >= ALERT_THRESHOLD_ANTIBODY) {
+    antibodySpawnTimer -= dt;
+    if (antibodySpawnTimer <= 0 && antibodies.filter(ab => !ab.attached).length < 2) {
+      const noteIdx = Math.floor(Math.random() * 3);
+      antibodies.push(new Antibody(...randomEdgePos(), noteIdx, ANTIBODY_FREQS[noteIdx]));
+      antibodySpawnTimer = 12 + Math.random() * 6;
+    }
+  }
+
+  // Harder antibody shake-off: requires a more forceful direction reversal
+  const hardShake = playerShook && Math.hypot(player.vx, player.vy) > 160;
   for (let i = antibodies.length - 1; i >= 0; i--) {
     const ab = antibodies[i];
     ab.update(dt, player);
@@ -431,7 +543,7 @@ function loop(ts) {
       player.chord[ab.targetNoteIdx] = ANTIBODY_FREQS[ab.targetNoteIdx];
       playAntibodyAttach();
     }
-    if (ab.attached && playerShook) {
+    if (ab.attached && hardShake) {
       player.chord[ab.targetNoteIdx] = player.baseChord[ab.targetNoteIdx];
       antibodies.splice(i, 1);
       proteinDetachSound();
@@ -460,6 +572,7 @@ function loop(ts) {
   ctx.save();
   ctx.translate(canvas.width / 2 - player.x, canvas.height / 2 - player.y);
 
+  for (const bc of bcells) drawBCell(ctx, bc, bc.active ? bc.getActiveNote(player.x, player.y) : null);
   for (const c of cells) {
     if (!c.active && c.flashTimer <= 0) continue;
     const cActiveFreq = c.active ? c.getActiveNote(player.x, player.y) : null;
@@ -475,7 +588,7 @@ function loop(ts) {
   }
   for (const c of clones) drawClone(ctx, c);
   for (const m of macrophages) drawMacrophage(ctx, m, now);
-  for (const tc of tcells) drawTCell(ctx, tc);
+  for (const tc of tcells) drawTCell(ctx, tc, tcellMatchable);
   for (const ab of antibodies) drawAntibody(ctx, ab);
   for (const n of neutrophils) if (!n.dead) drawNeutrophil(ctx, n);
   drawPlayer(ctx, player, activePlayerNote);
