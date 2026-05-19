@@ -411,7 +411,6 @@ function loop(ts) {
   // T-cell: always 1 present; orbits dissonant clones; escalates immune alert near them
   if (tcells.length < 1) tcells.push(new TCell(...randomEdgePos()));
   tcells = tcells.filter(tc => Math.hypot(tc.x - player.x, tc.y - player.y) < 1500);
-  const tcellMatchable = attachedProteinCount >= 3;
   for (const tc of tcells) {
     tc.update(dt, clones);
     for (const c of clones) {
@@ -423,8 +422,9 @@ function loop(ts) {
         break;
       }
     }
-    // Player can neutralise T-cell only when maximally loaded with all 3 complement proteins
-    if (tcellMatchable && Math.hypot(tc.x - player.x, tc.y - player.y) < tc.radius + player.radius) {
+    // T-cell always attackable; its chromatic motif makes it naturally hard to match
+    // without first mutating the player chord toward its key
+    if (Math.hypot(tc.x - player.x, tc.y - player.y) < tc.radius + player.radius) {
       const pNote = player.getActiveNote(tc.x, tc.y);
       const tNote = tc.getActiveNote(player.x, player.y);
       if (roughness([pNote], [tNote], DEFAULT_TIMBRE) < INFECTION_THRESHOLD) {
@@ -604,7 +604,11 @@ function loop(ts) {
   }
   for (const c of clones) drawClone(ctx, c);
   for (const m of macrophages) drawMacrophage(ctx, m, now);
-  for (const tc of tcells) drawTCell(ctx, tc, tcellMatchable);
+  for (const tc of tcells) {
+    const pn = player.getActiveNote(tc.x, tc.y);
+    const tn = tc.getActiveNote(player.x, player.y);
+    drawTCell(ctx, tc, roughness([pn], [tn], DEFAULT_TIMBRE) < INFECTION_THRESHOLD);
+  }
   for (const ab of antibodies) drawAntibody(ctx, ab);
   for (const n of neutrophils) if (!n.dead) drawNeutrophil(ctx, n);
   drawPlayer(ctx, player, activePlayerNote);
