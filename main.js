@@ -458,15 +458,16 @@ function loop(ts) {
 
   for (const c of cells) {
     if (!c.active && c.flashTimer <= 0) continue;
+    const cActiveFreq = c.active ? c.getActiveNote(player.x, player.y) : null;
     if (c.active) {
       const r = roughness(
         [player.getActiveNote(c.x, c.y)],
-        [c.getActiveNote(player.x, player.y)],
+        [cActiveFreq],
         DEFAULT_TIMBRE,
       );
       drawGlow(ctx, player, c, r);
     }
-    drawCell(ctx, c);
+    drawCell(ctx, c, cActiveFreq);
   }
   for (const c of clones) drawClone(ctx, c);
   for (const m of macrophages) drawMacrophage(ctx, m, now);

@@ -68,7 +68,7 @@ export function drawPlayer(ctx, player, activeFreq) {
   }
 }
 
-export function drawCell(ctx, cell) {
+export function drawCell(ctx, cell, activeFreq = null) {
   const alpha = cell.flashTimer > 0
     ? 0.5 + 0.5 * (cell.flashTimer / 0.5)
     : 0.6;
@@ -77,9 +77,10 @@ export function drawCell(ctx, cell) {
   drawCircle(ctx, cell.x, cell.y, cell.radius, color, alpha);
 
   for (const dot of cell.getDots()) {
+    const isActive = activeFreq !== null && dot.freq === activeFreq;
     ctx.save();
-    ctx.globalAlpha  = alpha;
-    ctx.font         = 'bold 14px sans-serif';
+    ctx.globalAlpha  = isActive ? 1 : alpha * 0.9;
+    ctx.font         = `bold ${isActive ? 14 : 12}px sans-serif`;
     ctx.fillStyle    = color;
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
