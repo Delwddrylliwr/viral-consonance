@@ -153,14 +153,14 @@ export function createCloneVoice() {
 }
 
 // Short dissonant minor-second stab
-export function dissonantStab() {
+export function dissonantStab(noteA, noteB) {
   const poly = new Tone.PolySynth(Tone.Synth, {
     oscillator: { type: 'sawtooth' },
     envelope: { attack: 0.005, decay: 0.12, sustain: 0.0, release: 0.05 },
   }).toDestination();
   poly.volume.value = -8;
 
-  poly.triggerAttackRelease(['C4', 'Db4'], '16n');
+  poly.triggerAttackRelease([noteA, noteB], '16n');
   _voiceCount += 2;
   setTimeout(() => {
     _voiceCount = Math.max(0, _voiceCount - 2);

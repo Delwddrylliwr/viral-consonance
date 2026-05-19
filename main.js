@@ -356,7 +356,7 @@ function loop(ts) {
       }, 650);
     } else {
       bouncePlayer(player, c, r);
-      dissonantStab();
+      dissonantStab(pNote, cNote);
       immuneAlertLevel = Math.min(1.0, immuneAlertLevel + 0.3);
       setTempo(Math.min(160, BASE_BPM + clones.length * BPM_PER_CLONE));
       setMasterVolume(getBPM());
