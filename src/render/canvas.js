@@ -291,20 +291,69 @@ export function drawMacrophage(ctx, m, time) {
   ctx.restore();
 }
 
-// Slowly rotating square — 4-note motif matches the regular cell polygon
-export function drawTCell(ctx, tc) {
+// Slowly rotating square — 4-note motif at corners, visible when matchable (player fully loaded with proteins)
+export function drawTCell(ctx, tc, matchable = false) {
   ctx.save();
   ctx.translate(tc.x, tc.y);
   ctx.rotate(tc.angle);
   const s = tc.radius;
   ctx.beginPath();
   ctx.rect(-s, -s, s * 2, s * 2);
-  ctx.strokeStyle = 'rgba(32, 178, 170, 0.8)';
-  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = matchable ? 'rgba(180, 80, 255, 0.9)' : 'rgba(32, 178, 170, 0.8)';
+  ctx.lineWidth = matchable ? 3 : 2.5;
   ctx.stroke();
-  ctx.fillStyle = 'rgba(32, 178, 170, 0.12)';
+  ctx.fillStyle = matchable ? 'rgba(180, 80, 255, 0.18)' : 'rgba(32, 178, 170, 0.12)';
   ctx.fill();
   ctx.restore();
+
+  // Motif notes at the 4 corners (always faint; bold when matchable)
+  const dots = tc.getDots();
+  for (const dot of dots) {
+    ctx.save();
+    ctx.globalAlpha  = matchable ? 0.9 : 0.25;
+    ctx.font         = `bold ${matchable ? 13 : 11}px sans-serif`;
+    ctx.fillStyle    = matchable ? '#e0aaff' : '#20b2aa';
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(noteLabel(dot.freq), dot.x, dot.y);
+    ctx.restore();
+  }
+}
+
+// Octagon B-cell that launches antibodies; flees off-screen
+export function drawBCell(ctx, bc, activeFreq = null) {
+  const alpha = bc.flashTimer > 0 ? 0.5 + 0.5 * (bc.flashTimer / 0.5) : 0.6;
+  const color = bc.flashTimer > 0 ? '#fff' : bc.color;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const a = bc.rotation + i * (Math.PI / 4);
+    const x = bc.x + Math.cos(a) * bc.radius;
+    const y = bc.y + Math.sin(a) * bc.radius;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.globalAlpha = alpha * 0.08;
+  ctx.fill();
+  ctx.restore();
+
+  for (const dot of bc.getDots()) {
+    const isActive = activeFreq !== null && dot.freq === activeFreq;
+    ctx.save();
+    ctx.globalAlpha  = isActive ? 1 : alpha * 0.85;
+    ctx.font         = `bold ${isActive ? 13 : 11}px sans-serif`;
+    ctx.fillStyle    = color;
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(noteLabel(dot.freq), dot.x, dot.y);
+    ctx.restore();
+  }
 }
 
 // Diamond-shaped seeking missile — tip points in direction of travel
@@ -366,9 +415,9 @@ export function drawNeutrophil(ctx, n) {
 
   ctx.rotate(n.jitterAngle);
   ctx.beginPath();
-  for (let i = 0; i < 10; i++) {
-    const a  = (i / 10) * Math.PI * 2 - Math.PI / 2;
-    const rr = i % 2 === 0 ? n.radius : n.radius * 0.4;
+  for (let i = 0; i < 16; i++) {
+    const a  = (i / 16) * Math.PI * 2 - Math.PI / 8;
+    const rr = i % 2 === 0 ? n.radius : n.radius * 0.45;
     if (i === 0) ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
     else ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
   }
