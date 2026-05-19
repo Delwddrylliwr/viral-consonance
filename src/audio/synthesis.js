@@ -82,23 +82,22 @@ export function createCellVoice() {
   };
 }
 
-// V → I cadence in C major: G major triad (with 7th) → C major triad
-export function resolutionCadence() {
+// Contact sting: the two notes that coincided, then the player chord as resolution
+export function resolutionCadence(contactNotes, playerChord) {
   const poly = new Tone.PolySynth(Tone.Synth, {
     oscillator: { type: 'triangle' },
-    envelope: { attack: 0.02, decay: 0.4, sustain: 0.55, release: 1.2 },
+    envelope: { attack: 0.01, decay: 0.2, sustain: 0.15, release: 0.5 },
   }).connect(getReverb());
-  poly.volume.value = -8;
+  poly.volume.value = -20;
 
   const now = Tone.now();
-  // G dominant 7th → C major (strong resolution feel)
-  poly.triggerAttackRelease(['G3', 'B3', 'D4', 'F4'], '4n', now);
-  poly.triggerAttackRelease(['C3', 'E4', 'G4', 'C5'], '2n', now + 0.6);
-  _voiceCount += 4;
+  poly.triggerAttackRelease(contactNotes, '8n', now);
+  poly.triggerAttackRelease(playerChord,  '8n', now + 0.25);
+  _voiceCount += 2;
   setTimeout(() => {
-    _voiceCount = Math.max(0, _voiceCount - 4);
+    _voiceCount = Math.max(0, _voiceCount - 2);
     poly.dispose();
-  }, 3500);
+  }, 2000);
 }
 
 // Master volume tracks tempo: quiet at floor (60 BPM), full at ceiling (160 BPM)

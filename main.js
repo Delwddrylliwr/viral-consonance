@@ -333,7 +333,7 @@ function loop(ts) {
         cellDot:   { x: cActiveDot.x, y: cActiveDot.y },
         timer: 0.3,
       };
-      resolutionCadence();
+      resolutionCadence([pNote, cNote], player.chord);
       // Spawn clones: each of 3 slots succeeds with probability ∝ consonance
       const spawnProb = Math.max(0, 1 - r / INFECTION_THRESHOLD);
       for (let i = 0; i < MAX_CLONES_PER_INFECTION; i++) {
