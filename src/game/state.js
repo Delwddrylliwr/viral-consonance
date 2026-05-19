@@ -14,5 +14,6 @@ export const state = {
   macrophageCount: 0,
   tcellCount: 0,
   immuneAlert: 0,
+  bcellFamiliarity: 0,
   dead: false,
 };

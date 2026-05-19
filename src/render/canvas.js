@@ -343,6 +343,19 @@ export function drawBCell(ctx, bc, activeFreq = null) {
   ctx.fill();
   ctx.restore();
 
+  // Threat arc — fills clockwise as familiarity grows; colour shifts orange → red
+  if (bc.familiarity > 0) {
+    ctx.save();
+    ctx.globalAlpha = 0.75;
+    ctx.beginPath();
+    ctx.arc(bc.x, bc.y, bc.radius + 7, -Math.PI / 2,
+            -Math.PI / 2 + bc.familiarity * Math.PI * 2);
+    ctx.strokeStyle = `hsl(${30 - bc.familiarity * 30}, 100%, 60%)`;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    ctx.restore();
+  }
+
   for (const dot of bc.getDots()) {
     const isActive = activeFreq !== null && dot.freq === activeFreq;
     ctx.save();

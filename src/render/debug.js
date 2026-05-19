@@ -14,6 +14,7 @@ export function drawDebug(ctx, state) {
     `MACROPHAG: ${state.macrophageCount}`,
     `TCELLS:    ${state.tcellCount}`,
     `ALERT:     ${state.immuneAlert.toFixed(2)}`,
+    `B-FAMIL:   ${state.bcellFamiliarity.toFixed(2)}`,
   ];
 
   ctx.save();

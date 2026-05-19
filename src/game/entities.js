@@ -498,6 +498,13 @@ export class BCell {
     this.color       = '#a3f';
     // 8-note motif at octagon corners (based on antibody freq harmonics)
     this.motif = [369.99, 392.00, 415.30, 440.00, 466.16, 493.88, 523.25, 554.37];
+    this.familiarity = 0;    // 0→1; grows over time, resets when player chord mutates
+    this.knownChord  = null; // serialised snapshot for change detection
+  }
+
+  // Spawn interval shrinks from 18s (unfamiliar) to 4s (fully learned)
+  getSpawnInterval() {
+    return 18 - this.familiarity * 14;
   }
 
   getDots() {
@@ -526,6 +533,14 @@ export class BCell {
     this.rotation += this.rotationSpeed * dt;
     this.launchTimer = Math.max(0, this.launchTimer - dt);
     if (this.flashTimer > 0) this.flashTimer = Math.max(0, this.flashTimer - dt);
+
+    // Adaptive learning: reset familiarity when player chord changes (mutation occurred)
+    const chordKey = player.chord.join(',');
+    if (this.knownChord !== chordKey) {
+      if (this.knownChord !== null) this.familiarity = 0;
+      this.knownChord = chordKey;
+    }
+    this.familiarity = Math.min(1, this.familiarity + dt / 90); // ~90s to fully learn
 
     const toPlayerX = player.x - this.x;
     const toPlayerY = player.y - this.y;

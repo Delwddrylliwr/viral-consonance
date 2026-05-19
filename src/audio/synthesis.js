@@ -180,6 +180,21 @@ export function playMacrophageConsume() {
   setTimeout(() => synth.dispose(), 600);
 }
 
+// Ascending shimmer when player chord mutates — distinct from resolution cadence
+export function playMutationSound() {
+  const poly = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: 'triangle' },
+    envelope: { attack: 0.03, decay: 0.5, sustain: 0.3, release: 1.0 },
+  }).connect(getReverb());
+  poly.volume.value = -9;
+  const now = Tone.now();
+  poly.triggerAttackRelease(['C5', 'G5'], '8n', now);
+  poly.triggerAttackRelease(['E5', 'B5'], '8n', now + 0.12);
+  poly.triggerAttackRelease(['C6'],       '8n', now + 0.24);
+  _voiceCount += 2;
+  setTimeout(() => { _voiceCount = Math.max(0, _voiceCount - 2); poly.dispose(); }, 2500);
+}
+
 // Tritone stab when an antibody latches onto the player
 export function playAntibodyAttach() {
   const poly = new Tone.PolySynth(Tone.Synth, {
