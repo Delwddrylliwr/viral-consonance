@@ -4,7 +4,7 @@ import { drawDebug } from './src/render/debug.js';
 import { DEBUG, state } from './src/game/state.js';
 import { startTransport, onBeat, getBPM, setTempo } from './src/audio/transport.js';
 import { createPlayerVoice, createCellVoice, createCloneVoice, voiceCount,
-         resolutionCadence, dissonantStab,
+         resolutionCadence, dissonantStab, playMutationSound,
          setMasterVolume, setChorusDepth, proteinAttachSound, proteinDetachSound, deathSequence,
          playMacrophageConsume, playAntibodyAttach, playNeutrophilTick, playNeutrophilExplode }
   from './src/audio/synthesis.js';
@@ -62,6 +62,9 @@ const MACROPHAGE_BASE = 2;
 const MACROPHAGE_MAX  = 7;
 // Tritone substitutions for player chord notes C4, E4, G4 (F#4, Bb4, C#5)
 const ANTIBODY_FREQS = [369.99, 466.16, 554.37];
+
+// Roughness threshold for chord mutation on infection (stricter than INFECTION_THRESHOLD)
+const MUTATION_THRESHOLD = 0.1;
 
 // Dissonance thresholds for escalating immune response
 const ALERT_THRESHOLD_NEUTROPHIL   = 0.2;
@@ -162,8 +165,9 @@ function init() {
     state.proteinCount   = proteins.length;
     state.cloneCount     = clones.length;
     state.macrophageCount = macrophages.length;
-    state.tcellCount     = tcells.length;
-    state.immuneAlert    = immuneAlertLevel;
+    state.tcellCount       = tcells.length;
+    state.immuneAlert      = immuneAlertLevel;
+    state.bcellFamiliarity = bcells.reduce((m, b) => Math.max(m, b.familiarity), 0);
 
     // Neutrophil fuse countdown — fires on each beat while attached to a clone or player
     for (const n of neutrophils.filter(n => (n.attached || n.attachedToPlayer) && !n.dead)) {
@@ -366,6 +370,18 @@ function loop(ts) {
       }
       setTempo(Math.min(160, BASE_BPM + clones.length * BPM_PER_CLONE));
       setMasterVolume(getBPM());
+      // Chord mutation: very consonant match lets player inherit a cell note
+      if (r < MUTATION_THRESHOLD) {
+        const otherCellNotes = c.motif.filter(n => Math.abs(n - cNote) > 0.01);
+        const nonActiveIdxs  = [0, 1, 2].filter(i => Math.abs(player.chord[i] - pNote) > 0.01);
+        if (otherCellNotes.length > 0 && nonActiveIdxs.length > 0) {
+          const inherited  = otherCellNotes[Math.floor(Math.random() * otherCellNotes.length)];
+          const replaceIdx = nonActiveIdxs[Math.floor(Math.random() * nonActiveIdxs.length)];
+          player.chord[replaceIdx]     = inherited;
+          player.baseChord[replaceIdx] = inherited;
+          playMutationSound();
+        }
+      }
       setTimeout(() => {
         cells = cells.filter(x => x.active || x.flashTimer > 0);
         while (cells.filter(x => x.active).length < MAX_CELLS) {
@@ -508,7 +524,7 @@ function loop(ts) {
         && antibodies.filter(ab => !ab.attached).length < 2) {
       const noteIdx = Math.floor(Math.random() * 3);
       antibodies.push(new Antibody(bc.x, bc.y, noteIdx, ANTIBODY_FREQS[noteIdx]));
-      bc.launchTimer = 12 + Math.random() * 6;
+      bc.launchTimer = bc.getSpawnInterval() * (0.85 + Math.random() * 0.3);
     }
     // Player can neutralise B-cell by matching a corner note
     if (Math.hypot(bc.x - player.x, bc.y - player.y) < bc.radius + player.radius) {
