@@ -253,7 +253,9 @@ function loop(ts) {
       ctx.font = '26px monospace';
       ctx.fillStyle = '#888';
       ctx.textAlign = 'center';
-      ctx.fillText(`max viral load  ${maxViralLoad}  (avg ${avgBpm} BPM)`, canvas.width / 2, canvas.height / 2 - 18);
+      ctx.fillText(`max viral load  ${maxViralLoad}`, canvas.width / 2, canvas.height / 2 - 28);
+      ctx.font = '20px monospace';
+      ctx.fillText(`(avg ${avgBpm} BPM)`, canvas.width / 2, canvas.height / 2 - 2);
       ctx.font = '15px monospace';
       ctx.fillStyle = '#444';
       ctx.fillText('click to restart', canvas.width / 2, canvas.height / 2 + 18);
