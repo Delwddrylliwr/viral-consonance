@@ -73,6 +73,7 @@ let dead = false;
 let deathFade = 0;
 let gameTime = 0;   // seconds of live play
 let bpmAccum = 0;   // ∫ BPM dt — divide by gameTime for average
+let maxViralLoad = 0;
 
 // --- helpers ---
 
@@ -136,6 +137,7 @@ function init() {
   deathFade          = 0;
   gameTime           = 0;
   bpmAccum           = 0;
+  maxViralLoad       = 0;
   state.dead         = false;
   letterBondFlash    = { playerDot: { x: 0, y: 0 }, cellDot: { x: 0, y: 0 }, timer: 0 };
 
@@ -246,13 +248,14 @@ function loop(ts) {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.restore();
     if (deathFade >= 0.95) {
-      const avgBpm = gameTime > 0 ? bpmAccum / gameTime : BASE_BPM;
-      const avgViralLoad = Math.max(0, Math.round((avgBpm - BASE_BPM) / BPM_PER_CLONE));
+      const avgBpm = Math.round(gameTime > 0 ? bpmAccum / gameTime : BASE_BPM);
       ctx.save();
       ctx.font = '26px monospace';
       ctx.fillStyle = '#888';
       ctx.textAlign = 'center';
-      ctx.fillText(`avg viral load  ${avgViralLoad}`, canvas.width / 2, canvas.height / 2 - 18);
+      ctx.fillText(`max viral load  ${maxViralLoad}`, canvas.width / 2, canvas.height / 2 - 28);
+      ctx.font = '20px monospace';
+      ctx.fillText(`(avg ${avgBpm} BPM)`, canvas.width / 2, canvas.height / 2 - 2);
       ctx.font = '15px monospace';
       ctx.fillStyle = '#444';
       ctx.fillText('click to restart', canvas.width / 2, canvas.height / 2 + 18);
@@ -265,6 +268,7 @@ function loop(ts) {
   // Accumulate BPM for final score
   gameTime += dt;
   bpmAccum += getBPM() * dt;
+  if (clones.length > maxViralLoad) maxViralLoad = clones.length;
 
   // Clone lifecycle — expired clones reduce viral load (and thus BPM)
   clones = clones.filter(c => c.alive);
