@@ -378,8 +378,17 @@ function loop(ts) {
       setMasterVolume(getBPM());
       // Chord mutation: very consonant match lets player inherit a cell note
       if (r < MUTATION_THRESHOLD) {
-        const otherCellNotes = c.motif.filter(n => Math.abs(n - cNote) > 0.01);
-        const nonActiveIdxs  = [0, 1, 2].filter(i => Math.abs(player.chord[i] - pNote) > 0.01);
+        // Only inherit notes with a pitch class not already in the player chord.
+        // sameChroma: two frequencies share a pitch class if their ratio is a power of 2.
+        const sameChroma = (f1, f2) => {
+          const oct = Math.log2(f1 > f2 ? f1 / f2 : f2 / f1);
+          return Math.abs(oct - Math.round(oct)) < 0.02;
+        };
+        const otherCellNotes = c.motif.filter(n =>
+          Math.abs(n - cNote) > 0.01 &&
+          !player.chord.some(p => sameChroma(p, n))
+        );
+        const nonActiveIdxs = [0, 1, 2].filter(i => Math.abs(player.chord[i] - pNote) > 0.01);
         if (otherCellNotes.length > 0 && nonActiveIdxs.length > 0) {
           const inherited  = otherCellNotes[Math.floor(Math.random() * otherCellNotes.length)];
           const replaceIdx = nonActiveIdxs[Math.floor(Math.random() * nonActiveIdxs.length)];
