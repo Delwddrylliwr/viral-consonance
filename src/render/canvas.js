@@ -58,8 +58,8 @@ export function drawPlayer(ctx, player, activeFreq) {
   for (const dot of dots) {
     const isActive = dot.freq === activeFreq;
     ctx.save();
-    ctx.globalAlpha  = isActive ? 1 : 0.45;
-    ctx.font         = `bold ${isActive ? 14 : 11}px sans-serif`;
+    ctx.globalAlpha  = isActive ? 1 : 0.7;
+    ctx.font         = `bold ${isActive ? 14 : 12}px sans-serif`;
     ctx.fillStyle    = isActive ? '#fff' : '#4af';
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
@@ -79,7 +79,7 @@ export function drawCell(ctx, cell) {
   for (const dot of cell.getDots()) {
     ctx.save();
     ctx.globalAlpha  = alpha;
-    ctx.font         = 'bold 13px sans-serif';
+    ctx.font         = 'bold 14px sans-serif';
     ctx.fillStyle    = color;
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
