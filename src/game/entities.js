@@ -145,6 +145,7 @@ export class ComplementProtein {
     this.attachDist  = 0;
     this.targetIndex     = Math.floor(Math.random() * 3);
     this.replacementNote = PROTEIN_REPLACEMENTS[this.targetIndex];
+    this.matchingNote    = PLAYER_CHORD[this.targetIndex];
     // Ambient drift — no active homing toward player
     const angle = Math.random() * Math.PI * 2;
     const speed = 18 + Math.random() * 16; // 18–34 px/s

@@ -1,4 +1,10 @@
+import { hzToName } from '../audio/scale.js';
+
 const BG = '#0d0d14';
+
+function noteLabel(hz) {
+  return hzToName(hz).replace(/\d+$/, ''); // "C4" → "C", "Db4" → "Db"
+}
 
 export function initCanvas() {
   const canvas = document.getElementById('game');
@@ -48,15 +54,16 @@ export function drawPlayer(ctx, player, activeFreq) {
   ctx.stroke();
   ctx.restore();
 
-  // Dots at each vertex
+  // Note letters at each vertex
   for (const dot of dots) {
     const isActive = dot.freq === activeFreq;
     ctx.save();
-    ctx.globalAlpha = isActive ? 1 : 0.45;
-    ctx.beginPath();
-    ctx.arc(dot.x, dot.y, isActive ? 6 : 4, 0, Math.PI * 2);
-    ctx.fillStyle = isActive ? '#fff' : '#4af';
-    ctx.fill();
+    ctx.globalAlpha  = isActive ? 1 : 0.45;
+    ctx.font         = `bold ${isActive ? 14 : 11}px sans-serif`;
+    ctx.fillStyle    = isActive ? '#fff' : '#4af';
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(noteLabel(dot.freq), dot.x, dot.y);
     ctx.restore();
   }
 }
@@ -71,11 +78,12 @@ export function drawCell(ctx, cell) {
 
   for (const dot of cell.getDots()) {
     ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.beginPath();
-    ctx.arc(dot.x, dot.y, 5, 0, Math.PI * 2);
-    ctx.fillStyle = color;
-    ctx.fill();
+    ctx.globalAlpha  = alpha;
+    ctx.font         = 'bold 13px sans-serif';
+    ctx.fillStyle    = color;
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(noteLabel(dot.freq), dot.x, dot.y);
     ctx.restore();
   }
 }
@@ -136,15 +144,53 @@ export function drawGlow(ctx, player, cell, roughness) {
   ctx.restore();
 }
 
-export function drawProtein(ctx, protein) {
+export function drawProtein(ctx, protein, player) {
   const color = protein.attached ? '#f55' : '#f93';
   drawCircle(ctx, protein.x, protein.y, protein.radius, color, 0.85);
+
+  // Outward direction from player through protein
+  const pdx  = protein.x - player.x;
+  const pdy  = protein.y - player.y;
+  const dist = Math.hypot(pdx, pdy) || 1;
+  const nx   = pdx / dist;
+  const ny   = pdy / dist;
+
+  // Letter positions: protein.radius + 9 px inward/outward from protein center
+  const offset = protein.radius + 9;
+  const innerX = protein.x - nx * offset;
+  const innerY = protein.y - ny * offset;
+  const outerX = protein.x + nx * offset;
+  const outerY = protein.y + ny * offset;
+
+  // Connecting line between the two label positions
   ctx.save();
-  ctx.globalAlpha = 0.6;
+  ctx.globalAlpha = 0.55;
+  ctx.strokeStyle = '#aaa';
+  ctx.lineWidth   = 1;
   ctx.beginPath();
-  ctx.arc(protein.x, protein.y, 4, 0, Math.PI * 2);
-  ctx.fillStyle = '#fff';
-  ctx.fill();
+  ctx.moveTo(innerX, innerY);
+  ctx.lineTo(outerX, outerY);
+  ctx.stroke();
+  ctx.restore();
+
+  // Inner: matchingNote (player's original note being replaced) — dim white, toward player
+  ctx.save();
+  ctx.globalAlpha  = 0.7;
+  ctx.font         = 'bold 11px sans-serif';
+  ctx.fillStyle    = '#ddd';
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(noteLabel(protein.matchingNote), innerX, innerY);
+  ctx.restore();
+
+  // Outer: replacementNote (the dissonant substitute) — protein color, facing outward
+  ctx.save();
+  ctx.globalAlpha  = 0.95;
+  ctx.font         = 'bold 12px sans-serif';
+  ctx.fillStyle    = color;
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(noteLabel(protein.replacementNote), outerX, outerY);
   ctx.restore();
 }
 
@@ -172,6 +218,29 @@ export function drawInfectionFlash(ctx, alpha) {
   ctx.globalAlpha = alpha * 0.25;
   ctx.fillStyle   = '#aaffcc';
   ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  ctx.restore();
+}
+
+// Brief bright line connecting two active note letters on consonant infection
+export function drawLetterBond(ctx, bond) {
+  if (bond.timer <= 0) return;
+  const alpha = bond.timer / 0.3;
+  ctx.save();
+  ctx.globalAlpha = alpha * 0.9;
+  ctx.strokeStyle = '#afffcc';
+  ctx.lineWidth   = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(bond.playerDot.x, bond.playerDot.y);
+  ctx.lineTo(bond.cellDot.x,   bond.cellDot.y);
+  ctx.stroke();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle   = '#fff';
+  ctx.beginPath();
+  ctx.arc(bond.playerDot.x, bond.playerDot.y, 3.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(bond.cellDot.x, bond.cellDot.y, 3.5, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }
 

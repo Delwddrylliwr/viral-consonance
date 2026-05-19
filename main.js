@@ -1,5 +1,5 @@
 import { initCanvas, clear, drawPlayer, drawCell, drawGlow, drawInfectionFlash, drawProtein, drawClone,
-         drawMacrophage, drawTCell, drawAntibody, drawNeutrophil } from './src/render/canvas.js';
+         drawMacrophage, drawTCell, drawAntibody, drawNeutrophil, drawLetterBond } from './src/render/canvas.js';
 import { drawDebug } from './src/render/debug.js';
 import { DEBUG, state } from './src/game/state.js';
 import { startTransport, onBeat, getBPM, setTempo } from './src/audio/transport.js';
@@ -68,6 +68,7 @@ let macrophages, tcells, antibodies, neutrophils;
 let antibodySpawnTimer = 15;
 let immuneAlertLevel = 0;
 let infectionFlash = 0;
+let letterBondFlash = { playerDot: { x: 0, y: 0 }, cellDot: { x: 0, y: 0 }, timer: 0 };
 let dead = false;
 let deathFade = 0;
 let gameTime = 0;   // seconds of live play
@@ -136,6 +137,7 @@ function init() {
   gameTime           = 0;
   bpmAccum           = 0;
   state.dead         = false;
+  letterBondFlash    = { playerDot: { x: 0, y: 0 }, cellDot: { x: 0, y: 0 }, timer: 0 };
 
   playerVoice = createPlayerVoice();
   cellVoice   = createCellVoice();
@@ -318,6 +320,15 @@ function loop(ts) {
       c.active = false;
       c.flashTimer = 0.5;
       infectionFlash = 1;
+      const pDots = player.getDots();
+      const cDots = c.getDots();
+      const pActiveDot = pDots.find(d => d.freq === pNote) ?? pDots[0];
+      const cActiveDot = cDots.find(d => d.freq === cNote) ?? cDots[0];
+      letterBondFlash = {
+        playerDot: { x: pActiveDot.x, y: pActiveDot.y },
+        cellDot:   { x: cActiveDot.x, y: cActiveDot.y },
+        timer: 0.3,
+      };
       resolutionCadence();
       // Spawn clones: each of 3 slots succeeds with probability ∝ consonance
       const spawnProb = Math.max(0, 1 - r / INFECTION_THRESHOLD);
@@ -437,6 +448,7 @@ function loop(ts) {
     : player.getActiveNote(0, 0);
 
   infectionFlash = Math.max(0, infectionFlash - dt * 2.5);
+  letterBondFlash.timer = Math.max(0, letterBondFlash.timer - dt);
 
   // Render
   clear(ctx);
@@ -462,7 +474,8 @@ function loop(ts) {
   for (const ab of antibodies) drawAntibody(ctx, ab);
   for (const n of neutrophils) if (!n.dead) drawNeutrophil(ctx, n);
   drawPlayer(ctx, player, activePlayerNote);
-  for (const p of proteins) drawProtein(ctx, p);
+  for (const p of proteins) drawProtein(ctx, p, player);
+  drawLetterBond(ctx, letterBondFlash);
 
   ctx.restore();
 
