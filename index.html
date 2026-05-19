@@ -10,16 +10,20 @@
     canvas { display: block; }
     #start {
       position: fixed; inset: 0;
-      display: flex; align-items: center; justify-content: center;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px;
       background: #0d0d14; color: #aaa; font: 18px/1.5 monospace;
       cursor: pointer; user-select: none; touch-action: manipulation;
     }
+    #start p { font-size: 15px; color: #666; letter-spacing: 0.04em; }
     #start span { border: 1px solid #444; padding: 12px 28px; }
   </style>
 </head>
 <body>
   <canvas id="game"></canvas>
-  <div id="start"><span>click to start</span></div>
+  <div id="start">
+    <p>can you make some viral sounds?</p>
+    <span>begin infection</span>
+  </div>
 
   <script src="./lib/Tone.js"></script>
   <script type="module" src="main.js"></script>
