@@ -268,9 +268,12 @@ function loop(ts) {
       const avgBpm = gameTime > 0 ? bpmAccum / gameTime : BASE_BPM;
       const avgViralLoad = Math.max(0, Math.round((avgBpm - BASE_BPM) / BPM_PER_CLONE));
       ctx.save();
+      ctx.font = '20px monospace';
+      ctx.fillStyle = '#aaa';
+      ctx.textAlign = 'center';
+      ctx.fillText('your infection has been contained', canvas.width / 2, canvas.height / 2 - 54);
       ctx.font = '26px monospace';
       ctx.fillStyle = '#888';
-      ctx.textAlign = 'center';
       ctx.fillText(`avg viral load  ${avgViralLoad}`, canvas.width / 2, canvas.height / 2 - 18);
       ctx.font = '15px monospace';
       ctx.fillStyle = '#444';
