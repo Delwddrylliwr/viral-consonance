@@ -338,10 +338,12 @@ export class TCell {
 }
 
 export class Antibody {
-  constructor(x, y, targetNoteIdx) {
+  constructor(x, y, targetNoteIdx, replacementNote) {
     this.x = x; this.y = y;
     this.radius = 11;
-    this.targetNoteIdx = targetNoteIdx;
+    this.targetNoteIdx   = targetNoteIdx;
+    this.replacementNote = replacementNote;
+    this.matchingNote    = PLAYER_CHORD[targetNoteIdx];
     this.attached      = false;
     this.attachAngle   = 0;
     this.vx = 0; this.vy = 0;

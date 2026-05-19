@@ -415,7 +415,7 @@ function loop(ts) {
   antibodySpawnTimer -= dt;
   if (antibodySpawnTimer <= 0 && antibodies.filter(ab => !ab.attached).length < 2) {
     const noteIdx = Math.floor(Math.random() * 3);
-    antibodies.push(new Antibody(...randomEdgePos(), noteIdx));
+    antibodies.push(new Antibody(...randomEdgePos(), noteIdx, ANTIBODY_FREQS[noteIdx]));
     antibodySpawnTimer = 12 + Math.random() * 6;
   }
   for (let i = antibodies.length - 1; i >= 0; i--) {

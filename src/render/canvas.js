@@ -314,10 +314,11 @@ export function drawAntibody(ctx, ab) {
   const spd = Math.hypot(ab.vx, ab.vy);
   if (spd > 0.1) ctx.rotate(Math.atan2(ab.vy, ab.vx) + Math.PI / 2);
   const r = ab.radius;
+  const len = r * 2.5; // elongated long axis
   ctx.beginPath();
-  ctx.moveTo(0, -r * 1.5);
+  ctx.moveTo(0, -len);
   ctx.lineTo(r, 0);
-  ctx.lineTo(0,  r * 1.5);
+  ctx.lineTo(0,  len);
   ctx.lineTo(-r, 0);
   ctx.closePath();
   ctx.fillStyle   = 'rgba(220, 80, 80, 0.7)';
@@ -325,6 +326,27 @@ export function drawAntibody(ctx, ab) {
   ctx.lineWidth = 1.5;
   ctx.fill();
   ctx.stroke();
+
+  // Front tip (toward player): matching note — dim white
+  ctx.save();
+  ctx.globalAlpha  = 0.7;
+  ctx.font         = 'bold 11px sans-serif';
+  ctx.fillStyle    = '#ddd';
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(noteLabel(ab.matchingNote), 0, -(len + 9));
+  ctx.restore();
+
+  // Back tip (tail): replacement note — red
+  ctx.save();
+  ctx.globalAlpha  = 0.95;
+  ctx.font         = 'bold 12px sans-serif';
+  ctx.fillStyle    = '#ff4444';
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(noteLabel(ab.replacementNote), 0, len + 9);
+  ctx.restore();
+
   ctx.restore();
 }
 
