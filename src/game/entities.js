@@ -360,7 +360,7 @@ export class TCell {
     return best.freq;
   }
 
-  update(dt, clones) {
+  update(dt, clones, player) {
     this.angle += dt * 0.4;
     this.escalationCooldown = Math.max(0, this.escalationCooldown - dt);
     this.scanTimer -= dt;
@@ -371,6 +371,18 @@ export class TCell {
             !b || (c.roughness || 0) > (b.roughness || 0) ? c : b, null)
         : null;
       this.scanTimer = 1.2;
+    }
+
+    const EVADE_RADIUS = 160;
+    if (player) {
+      const edx = this.x - player.x;
+      const edy = this.y - player.y;
+      const eDist = Math.hypot(edx, edy) || 1;
+      if (eDist < EVADE_RADIUS) {
+        this.x += (edx / eDist) * this.speed * dt;
+        this.y += (edy / eDist) * this.speed * dt;
+        return;
+      }
     }
 
     if (this.dissonanceTarget && clones.includes(this.dissonanceTarget)) {

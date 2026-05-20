@@ -65,6 +65,7 @@ const ANTIBODY_FREQS = [369.99, 466.16, 554.37];
 
 // Roughness threshold for chord mutation on infection (stricter than INFECTION_THRESHOLD)
 const MUTATION_THRESHOLD = 0.1;
+const TCELL_CAPTURE_THRESHOLD = 0.15; // stricter than INFECTION_THRESHOLD for T-cells
 
 // Dissonance thresholds for escalating immune response
 const ALERT_THRESHOLD_NEUTROPHIL   = 0.2;
@@ -428,7 +429,7 @@ function loop(ts) {
   if (tcells.length < 1 && tcellRespawnTimer <= 0) tcells.push(new TCell(...randomEdgePos()));
   tcells = tcells.filter(tc => Math.hypot(tc.x - player.x, tc.y - player.y) < 1500);
   for (const tc of tcells) {
-    tc.update(dt, clones);
+    tc.update(dt, clones, player);
     for (const c of clones) {
       if ((c.roughness || 0) > 0.35
           && Math.hypot(tc.x - c.x, tc.y - c.y) < tc.radius + c.radius + 15
@@ -443,7 +444,7 @@ function loop(ts) {
     if (Math.hypot(tc.x - player.x, tc.y - player.y) < tc.radius + player.radius) {
       const pNote = player.getActiveNote(tc.x, tc.y);
       const tNote = tc.getActiveNote(player.x, player.y);
-      if (roughness([pNote], [tNote], DEFAULT_TIMBRE) < INFECTION_THRESHOLD) {
+      if (roughness([pNote], [tNote], DEFAULT_TIMBRE) < TCELL_CAPTURE_THRESHOLD) {
         tcells = tcells.filter(t => t !== tc);
         immuneAlertLevel = Math.max(0, immuneAlertLevel - 0.3);
         tcellRespawnTimer = 25; // 25 s delay before a new T-cell appears
@@ -625,7 +626,7 @@ function loop(ts) {
   for (const tc of tcells) {
     const pn = player.getActiveNote(tc.x, tc.y);
     const tn = tc.getActiveNote(player.x, player.y);
-    drawTCell(ctx, tc, roughness([pn], [tn], DEFAULT_TIMBRE) < INFECTION_THRESHOLD);
+    drawTCell(ctx, tc, roughness([pn], [tn], DEFAULT_TIMBRE) < TCELL_CAPTURE_THRESHOLD);
   }
   for (const ab of antibodies) drawAntibody(ctx, ab);
   for (const n of neutrophils) if (!n.dead) drawNeutrophil(ctx, n);
