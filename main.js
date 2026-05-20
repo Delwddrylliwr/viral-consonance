@@ -63,9 +63,6 @@ const MACROPHAGE_MAX  = 7;
 // Tritone substitutions for player chord notes C4, E4, G4 (F#4, Bb4, C#5)
 const ANTIBODY_FREQS = [369.99, 466.16, 554.37];
 
-// Roughness threshold for chord mutation on infection (stricter than INFECTION_THRESHOLD)
-const MUTATION_THRESHOLD = 0.1;
-
 // Dissonance thresholds for escalating immune response
 const ALERT_THRESHOLD_NEUTROPHIL   = 0.2;
 const ALERT_THRESHOLD_MACROPHAGE   = 0.3;
@@ -90,6 +87,21 @@ let maxViralLoad = 0;
 // --- helpers ---
 
 function cellDist(c) { return Math.hypot(c.x - player.x, c.y - player.y); }
+
+function mutatePlayerChord(sourceMotif) {
+  const sameChroma = (f1, f2) => {
+    const oct = Math.log2(f1 > f2 ? f1 / f2 : f2 / f1);
+    return Math.abs(oct - Math.round(oct)) < 0.02;
+  };
+  const candidates = sourceMotif.filter(n => !player.chord.some(p => sameChroma(p, n)));
+  if (candidates.length > 0) {
+    const inherited  = candidates[Math.floor(Math.random() * candidates.length)];
+    const replaceIdx = Math.floor(Math.random() * 3);
+    player.chord[replaceIdx]     = inherited;
+    player.baseChord[replaceIdx] = inherited;
+    playMutationSound();
+  }
+}
 
 // Spawn position at the edge of the visible screen area
 function randomEdgePos() {
@@ -376,27 +388,6 @@ function loop(ts) {
       }
       setTempo(Math.min(160, BASE_BPM + clones.length * BPM_PER_CLONE));
       setMasterVolume(getBPM());
-      // Chord mutation: very consonant match lets player inherit a cell note
-      if (r < MUTATION_THRESHOLD) {
-        // Only inherit notes with a pitch class not already in the player chord.
-        // sameChroma: two frequencies share a pitch class if their ratio is a power of 2.
-        const sameChroma = (f1, f2) => {
-          const oct = Math.log2(f1 > f2 ? f1 / f2 : f2 / f1);
-          return Math.abs(oct - Math.round(oct)) < 0.02;
-        };
-        const otherCellNotes = c.motif.filter(n =>
-          Math.abs(n - cNote) > 0.01 &&
-          !player.chord.some(p => sameChroma(p, n))
-        );
-        const nonActiveIdxs = [0, 1, 2].filter(i => Math.abs(player.chord[i] - pNote) > 0.01);
-        if (otherCellNotes.length > 0 && nonActiveIdxs.length > 0) {
-          const inherited  = otherCellNotes[Math.floor(Math.random() * otherCellNotes.length)];
-          const replaceIdx = nonActiveIdxs[Math.floor(Math.random() * nonActiveIdxs.length)];
-          player.chord[replaceIdx]     = inherited;
-          player.baseChord[replaceIdx] = inherited;
-          playMutationSound();
-        }
-      }
       setTimeout(() => {
         cells = cells.filter(x => x.active || x.flashTimer > 0);
         while (cells.filter(x => x.active).length < MAX_CELLS) {
@@ -447,6 +438,7 @@ function loop(ts) {
         tcells = tcells.filter(t => t !== tc);
         immuneAlertLevel = Math.max(0, immuneAlertLevel - 0.3);
         tcellRespawnTimer = 25; // 25 s delay before a new T-cell appears
+        mutatePlayerChord(tc.motif);
         resolutionCadence();
         break;
       }
@@ -551,6 +543,7 @@ function loop(ts) {
       if (roughness([pNote], [bNote], DEFAULT_TIMBRE) < INFECTION_THRESHOLD) {
         bc.active = false;
         bc.flashTimer = 0.5;
+        mutatePlayerChord(bc.motif);
         resolutionCadence();
       }
     }
