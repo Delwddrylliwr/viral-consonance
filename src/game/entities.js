@@ -15,7 +15,7 @@ const CELL_DEFS = [
 ];
 const CELL_DRIFT = 18; // px/s gentle background drift
 
-function angleDiff(a, b) {
+export function angleDiff(a, b) {
   return ((a - b) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI;
 }
 

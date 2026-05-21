@@ -10,7 +10,7 @@ import { createPlayerVoice, createCellVoice, createCloneVoice, voiceCount,
   from './src/audio/synthesis.js';
 import { roughness, DEFAULT_TIMBRE } from './src/audio/consonance.js';
 import { PLAYER_CHORD } from './src/audio/scale.js';
-import { Player, Cell, Clone, Macrophage, TCell, Antibody, Neutrophil, BCell } from './src/game/entities.js';
+import { Player, Cell, Clone, Macrophage, TCell, Antibody, Neutrophil, BCell, angleDiff } from './src/game/entities.js';
 import { checkContact, bouncePlayer, spawnCell, INFECTION_THRESHOLD,
          checkContactProtein, spawnProtein }
   from './src/game/contact.js';
@@ -99,10 +99,21 @@ function randomEdgePos() {
   return [player.x + Math.cos(angle) * dist, player.y + Math.sin(angle) * dist];
 }
 
+function cellEffectiveDist(c) {
+  const d = cellDist(c);
+  const speed = Math.hypot(player.vx, player.vy);
+  if (speed < 30) return d;
+  const travelAngle = Math.atan2(player.vy, player.vx);
+  const toCell = Math.atan2(c.y - player.y, c.x - player.x);
+  const alignment = Math.cos(angleDiff(travelAngle, toCell));
+  const sf = Math.min(1, speed / 150);
+  return d / (1 + sf * alignment * 0.6);
+}
+
 function nearestActiveCell() {
   return cells.reduce((best, c) => {
     if (!c.active) return best;
-    return (!best || cellDist(c) < cellDist(best)) ? c : best;
+    return (!best || cellEffectiveDist(c) < cellEffectiveDist(best)) ? c : best;
   }, null);
 }
 
@@ -110,7 +121,7 @@ function updateCommittedCell() {
   const nearest = nearestActiveCell();
   if (!nearest) return;
   if (!committedCell || !committedCell.active) { committedCell = nearest; return; }
-  if (cellDist(nearest) < cellDist(committedCell) * 0.8) committedCell = nearest;
+  if (cellEffectiveDist(nearest) < cellEffectiveDist(committedCell) * 0.8) committedCell = nearest;
 }
 
 // ---
@@ -204,8 +215,8 @@ function init() {
     const pNote   = player.getActiveNote(committedCell.x, committedCell.y);
     const cNote   = committedCell.getActiveNote(player.x, player.y);
 
-    const distToCell = Math.hypot(committedCell.x - player.x, committedCell.y - player.y);
-    const cellVolDb = Math.max(-35, -8 - 20 * Math.log10(1 + distToCell / 150));
+    const dEff = cellEffectiveDist(committedCell);
+    const cellVolDb = Math.max(-35, -8 - 20 * Math.log10(1 + dEff / 150));
     cellVoice.trigger(cNote, cellVolDb);
     playerVoice.setFreq(pNote);
 
@@ -619,7 +630,10 @@ function loop(ts) {
       );
       drawGlow(ctx, player, c, r);
     }
-    drawCell(ctx, c, cActiveFreq);
+    const dEff = cellEffectiveDist(c);
+    const dActual = cellDist(c);
+    const cellAlpha = Math.max(0.15, Math.min(0.9, 0.6 * (dActual / dEff)));
+    drawCell(ctx, c, cActiveFreq, cellAlpha);
   }
   for (const c of clones) drawClone(ctx, c);
   for (const m of macrophages) drawMacrophage(ctx, m, now);
