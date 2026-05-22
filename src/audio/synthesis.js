@@ -100,9 +100,9 @@ export function resolutionCadence(contactNotes, playerChord) {
   }, 2000);
 }
 
-// Master volume tracks tempo: quiet at floor (60 BPM), full at ceiling (160 BPM)
+// Master volume tracks tempo: -18 dB at 60 BPM, reaches 0 dB at 160 BPM and stays there.
 export function setMasterVolume(bpm) {
-  const db = -18 + ((bpm - 60) / 100) * 18; // -18 dB → 0 dB
+  const db = Math.min(0, -18 + ((bpm - 60) / 100) * 18);
   Tone.getDestination().volume.rampTo(db, 0.5);
 }
 
@@ -166,6 +166,17 @@ export function dissonantStab(noteA, noteB) {
     _voiceCount = Math.max(0, _voiceCount - 2);
     poly.dispose();
   }, 500);
+}
+
+// Alarming low growl when a macrophage latches onto the player
+export function playMacrophageAttach() {
+  const synth = new Tone.Synth({
+    oscillator: { type: 'sawtooth' },
+    envelope: { attack: 0.02, decay: 0.6, sustain: 0.4, release: 1.0 },
+  }).toDestination();
+  synth.volume.value = -8;
+  synth.triggerAttackRelease('Bb1', '4n');
+  setTimeout(() => synth.dispose(), 2500);
 }
 
 // Low thud when a macrophage consumes a clone

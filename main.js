@@ -6,7 +6,7 @@ import { startTransport, onBeat, getBPM, setTempo } from './src/audio/transport.
 import { createPlayerVoice, createCellVoice, createCloneVoice, voiceCount,
          resolutionCadence, dissonantStab, playMutationSound,
          setMasterVolume, setChorusDepth, proteinAttachSound, proteinDetachSound, deathSequence,
-         playMacrophageConsume, playAntibodyAttach, playNeutrophilTick, playNeutrophilExplode }
+         playMacrophageConsume, playMacrophageAttach, playAntibodyAttach, playNeutrophilTick, playNeutrophilExplode }
   from './src/audio/synthesis.js';
 import { roughness, DEFAULT_TIMBRE } from './src/audio/consonance.js';
 import { PLAYER_CHORD } from './src/audio/scale.js';
@@ -215,7 +215,7 @@ function init() {
           const idx = clones.indexOf(n.target);
           if (idx !== -1) {
             clones.splice(idx, 1);
-            setTempo(Math.min(160, BASE_BPM + clones.length * BPM_PER_CLONE));
+            setTempo(BASE_BPM + clones.length * BPM_PER_CLONE);
           }
           n.dead = true;
           playNeutrophilExplode();
@@ -242,7 +242,7 @@ function init() {
     state.nearestCellNote   = nearest ? nearest.getActiveNote(player.x, player.y) : cNote;
     state.voiceCount        = voiceCount();
     setMasterVolume(getBPM());
-    setChorusDepth(Math.min(1, clones.length / 20)); // full width at 20 clones (160 BPM ceiling)
+    setChorusDepth(Math.min(1, clones.length / 20)); // full chorus width at 20 clones
 
     // Trigger the 2 nearest clones as ambient pitched voices
     const nearClones = [...clones]
@@ -329,7 +329,7 @@ function loop(ts) {
   // Clone lifecycle — expired clones reduce viral load (and thus BPM)
   clones = clones.filter(c => c.alive);
   for (const c of clones) c.update(dt);
-  setTempo(Math.min(160, BASE_BPM + clones.length * BPM_PER_CLONE));
+  setTempo(BASE_BPM + clones.length * BPM_PER_CLONE);
 
   // Beat phase 0–1 for macrophage erratic movement (0 = just hit beat)
   const beatDuration = 60 / getBPM();
@@ -401,7 +401,7 @@ function loop(ts) {
           ));
         }
       }
-      setTempo(Math.min(160, BASE_BPM + clones.length * BPM_PER_CLONE));
+      setTempo(BASE_BPM + clones.length * BPM_PER_CLONE);
       setMasterVolume(getBPM());
       setTimeout(() => {
         cells = cells.filter(x => x.active || x.flashTimer > 0);
@@ -414,7 +414,7 @@ function loop(ts) {
       bouncePlayer(player, c, r);
       dissonantStab(pNote, cNote);
       immuneAlertLevel = Math.min(1.0, immuneAlertLevel + 0.3);
-      setTempo(Math.min(160, BASE_BPM + clones.length * BPM_PER_CLONE));
+      setTempo(BASE_BPM + clones.length * BPM_PER_CLONE);
       setMasterVolume(getBPM());
     }
   }
@@ -479,6 +479,7 @@ function loop(ts) {
         && Math.hypot(m.x - player.x, m.y - player.y) < m.radius + player.radius) {
       m.eatingPlayer = true;
       m.eatTimer = 2.0;
+      playMacrophageAttach();
     }
     if (m.eatingPlayer) {
       m.eatTimer -= dt;
@@ -496,7 +497,7 @@ function loop(ts) {
         if (Math.hypot(m.x - clones[i].x, m.y - clones[i].y) < m.radius + clones[i].radius) {
           m.ingest(clones[i]);
           clones.splice(i, 1);
-          setTempo(Math.min(160, BASE_BPM + clones.length * BPM_PER_CLONE));
+          setTempo(BASE_BPM + clones.length * BPM_PER_CLONE);
           playMacrophageConsume();
           break;
         }
