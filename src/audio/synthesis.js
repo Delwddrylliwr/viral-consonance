@@ -100,9 +100,9 @@ export function resolutionCadence(contactNotes, playerChord) {
   }, 2000);
 }
 
-// Master volume tracks tempo: quiet at floor (60 BPM), full at ceiling (160 BPM)
+// Master volume tracks tempo: -18 dB at 60 BPM, reaches 0 dB at 160 BPM and stays there.
 export function setMasterVolume(bpm) {
-  const db = -18 + ((bpm - 60) / 100) * 18; // -18 dB → 0 dB
+  const db = Math.min(0, -18 + ((bpm - 60) / 100) * 18);
   Tone.getDestination().volume.rampTo(db, 0.5);
 }
 
