@@ -168,6 +168,17 @@ export function dissonantStab(noteA, noteB) {
   }, 500);
 }
 
+// Alarming low growl when a macrophage latches onto the player
+export function playMacrophageAttach() {
+  const synth = new Tone.Synth({
+    oscillator: { type: 'sawtooth' },
+    envelope: { attack: 0.02, decay: 0.6, sustain: 0.4, release: 1.0 },
+  }).toDestination();
+  synth.volume.value = -8;
+  synth.triggerAttackRelease('Bb1', '4n');
+  setTimeout(() => synth.dispose(), 2500);
+}
+
 // Low thud when a macrophage consumes a clone
 export function playMacrophageConsume() {
   const synth = new Tone.MembraneSynth({

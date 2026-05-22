@@ -270,6 +270,11 @@ export class Macrophage {
   }
 
   update(dt, clones, beatPhase, player, playerDissonance) {
+    if (this.eatingPlayer && player) {
+      this.x = player.x;
+      this.y = player.y;
+      return;
+    }
     this.retargetTimer -= dt;
     if (this.retargetTimer <= 0) {
       // At high player dissonance, occasionally target the player instead of a clone

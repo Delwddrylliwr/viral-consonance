@@ -6,7 +6,7 @@ import { startTransport, onBeat, getBPM, setTempo } from './src/audio/transport.
 import { createPlayerVoice, createCellVoice, createCloneVoice, voiceCount,
          resolutionCadence, dissonantStab, playMutationSound,
          setMasterVolume, setChorusDepth, proteinAttachSound, proteinDetachSound, deathSequence,
-         playMacrophageConsume, playAntibodyAttach, playNeutrophilTick, playNeutrophilExplode }
+         playMacrophageConsume, playMacrophageAttach, playAntibodyAttach, playNeutrophilTick, playNeutrophilExplode }
   from './src/audio/synthesis.js';
 import { roughness, DEFAULT_TIMBRE } from './src/audio/consonance.js';
 import { PLAYER_CHORD } from './src/audio/scale.js';
@@ -479,6 +479,7 @@ function loop(ts) {
         && Math.hypot(m.x - player.x, m.y - player.y) < m.radius + player.radius) {
       m.eatingPlayer = true;
       m.eatTimer = 2.0;
+      playMacrophageAttach();
     }
     if (m.eatingPlayer) {
       m.eatTimer -= dt;

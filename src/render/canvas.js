@@ -256,6 +256,9 @@ export function drawMacrophage(ctx, m, time) {
     const r = m.radius + off + Math.sin(time * 0.6 + i * 0.8) * 5;
     return { x: Math.cos(a) * r, y: Math.sin(a) * r };
   });
+  const eating = m.eatingPlayer;
+  const pulse  = eating ? 0.5 + 0.5 * Math.sin(time * 10) : 0;
+
   ctx.beginPath();
   for (let i = 0; i < N; i++) {
     const curr = pts[i], next = pts[(i + 1) % N];
@@ -264,10 +267,12 @@ export function drawMacrophage(ctx, m, time) {
     ctx.quadraticCurveTo(curr.x, curr.y, mx, my);
   }
   ctx.closePath();
-  ctx.fillStyle = 'rgba(107, 142, 35, 0.55)';
+  ctx.fillStyle = eating
+    ? `rgba(220, 50, 30, ${0.55 + pulse * 0.2})`
+    : 'rgba(107, 142, 35, 0.55)';
   ctx.fill();
-  ctx.strokeStyle = '#9acd32';
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = eating ? `rgba(255, 90, 60, ${0.8 + pulse * 0.2})` : '#9acd32';
+  ctx.lineWidth = eating ? 3 + pulse * 2 : 2;
   ctx.stroke();
 
   // Ghost triangles of ingested clones
