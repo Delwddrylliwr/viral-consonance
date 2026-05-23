@@ -637,7 +637,7 @@ function loop(ts) {
   for (const tc of tcells) {
     const pn = player.getActiveNote(tc.x, tc.y);
     const tn = tc.getActiveNote(player.x, player.y);
-    drawTCell(ctx, tc, roughness([pn], [tn], DEFAULT_TIMBRE) < TCELL_CAPTURE_THRESHOLD);
+    drawTCell(ctx, tc, roughness([pn], [tn], DEFAULT_TIMBRE) < TCELL_CAPTURE_THRESHOLD, immuneAlertLevel);
   }
   for (const ab of antibodies) drawAntibody(ctx, ab);
   for (const n of neutrophils) if (!n.dead) drawNeutrophil(ctx, n);
