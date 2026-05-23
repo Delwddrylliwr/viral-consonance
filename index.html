@@ -198,31 +198,14 @@
       }
 
       function miniProtein(ctx, cx, cy) {
-        const x0 = cx - 14, x1 = cx + 14;
         ctx.save();
         ctx.globalAlpha = 0.55;
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(x0, cy);
-        ctx.lineTo(x1, cy);
+        ctx.moveTo(cx - 14, cy);
+        ctx.lineTo(cx + 14, cy);
         ctx.stroke();
-        ctx.restore();
-        ctx.save();
-        ctx.globalAlpha = 0.7;
-        ctx.font = 'bold 11px sans-serif';
-        ctx.fillStyle = '#ddd';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('A', x0, cy);
-        ctx.restore();
-        ctx.save();
-        ctx.globalAlpha = 0.95;
-        ctx.font = 'bold 12px sans-serif';
-        ctx.fillStyle = '#f93';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('E♭', x1, cy);
         ctx.restore();
       }
 
