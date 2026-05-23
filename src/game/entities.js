@@ -540,6 +540,23 @@ export class Neutrophil {
   }
 }
 
+export class NeutrophilBlast {
+  constructor(x, y, maxRadius, speed) {
+    this.x = x;
+    this.y = y;
+    this.radius    = 0;
+    this.maxRadius = maxRadius;
+    this.speed     = speed;
+    this.dead      = false;
+    this.hitPlayer = false;
+  }
+
+  update(dt) {
+    this.radius = Math.min(this.maxRadius, this.radius + this.speed * dt);
+    if (this.radius >= this.maxRadius) this.dead = true;
+  }
+}
+
 export class BCell {
   constructor(x, y) {
     this.x = x; this.y = y;

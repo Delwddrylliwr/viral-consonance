@@ -489,3 +489,23 @@ export function drawNeutrophil(ctx, n) {
 
   ctx.restore();
 }
+
+export function drawNeutrophilBlast(ctx, blast) {
+  const progress  = blast.maxRadius > 0 ? blast.radius / blast.maxRadius : 1;
+  const alpha     = Math.max(0, 0.9 - progress * 0.85);
+  const lineWidth = 2 + (1 - progress) * 10;
+  ctx.save();
+  ctx.translate(blast.x, blast.y);
+  ctx.shadowColor = '#ff8800';
+  ctx.shadowBlur  = 24;
+  ctx.beginPath();
+  ctx.arc(0, 0, Math.max(1, blast.radius), 0, Math.PI * 2);
+  ctx.strokeStyle = `rgba(255, 140, 20, ${alpha})`;
+  ctx.lineWidth   = lineWidth;
+  ctx.stroke();
+  ctx.shadowBlur  = 8;
+  ctx.strokeStyle = `rgba(255, 240, 120, ${alpha * 0.55})`;
+  ctx.lineWidth   = lineWidth * 0.35;
+  ctx.stroke();
+  ctx.restore();
+}
