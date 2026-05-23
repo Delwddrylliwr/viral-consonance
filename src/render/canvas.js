@@ -147,7 +147,6 @@ export function drawGlow(ctx, player, cell, roughness) {
 
 export function drawProtein(ctx, protein, player) {
   const color = protein.attached ? '#f55' : '#f93';
-  drawCircle(ctx, protein.x, protein.y, protein.radius, color, 0.85);
 
   // Outward direction from player through protein
   const pdx  = protein.x - player.x;
@@ -166,7 +165,7 @@ export function drawProtein(ctx, protein, player) {
   // Connecting line between the two label positions
   ctx.save();
   ctx.globalAlpha = 0.55;
-  ctx.strokeStyle = '#aaa';
+  ctx.strokeStyle = '#fff';
   ctx.lineWidth   = 1;
   ctx.beginPath();
   ctx.moveTo(innerX, innerY);
