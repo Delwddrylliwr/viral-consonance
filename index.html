@@ -15,7 +15,26 @@
       cursor: pointer; user-select: none; touch-action: manipulation;
     }
     #start p { font-size: 15px; color: #666; letter-spacing: 0.04em; }
-    #start span { border: 1px solid #444; padding: 12px 28px; }
+    #start > span { border: 1px solid #444; padding: 12px 28px; }
+    #entity-key {
+      display: none;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px 32px;
+      font-size: 12px;
+      color: #555;
+      letter-spacing: 0.03em;
+      margin-top: 4px;
+    }
+    @media (min-height: 600px) and (min-width: 480px) {
+      #entity-key { display: grid; }
+    }
+    .ek-item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      white-space: nowrap;
+    }
+    .ek-item canvas { flex-shrink: 0; }
   </style>
 </head>
 <body>
@@ -23,9 +42,144 @@
   <div id="start">
     <p>can you make some viral sounds?</p>
     <span>begin infection</span>
+    <div id="entity-key">
+      <div class="ek-item"><canvas data-entity="player" width="44" height="44"></canvas><span>you — the virus</span></div>
+      <div class="ek-item"><canvas data-entity="cell"   width="44" height="44"></canvas><span>cell — match notes to infect</span></div>
+      <div class="ek-item"><canvas data-entity="clone"  width="44" height="44"></canvas><span>clone — make more of these</span></div>
+      <div class="ek-item"><canvas data-entity="neutrophil" width="44" height="44"></canvas><span>neutrophil — dodge their blast</span></div>
+      <div class="ek-item"><canvas data-entity="macrophage" width="44" height="44"></canvas><span>macrophage — eats your clones</span></div>
+      <div class="ek-item"><canvas data-entity="tcell"  width="44" height="44"></canvas><span>T-cell — hunts dissonant clones</span></div>
+    </div>
   </div>
 
   <script src="./lib/Tone.js"></script>
   <script type="module" src="main.js"></script>
+  <script>
+    (function () {
+      const BG = '#0d0d14';
+
+      function fill(canvas, fn) {
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = BG;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        fn(ctx, canvas.width / 2, canvas.height / 2);
+      }
+
+      function miniPlayer(ctx, cx, cy) {
+        const r = 14;
+        ctx.save();
+        ctx.globalAlpha = 0.7;
+        ctx.strokeStyle = '#4af';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (let i = 0; i < 3; i++) {
+          const a = (i / 3) * Math.PI * 2 - Math.PI / 2;
+          i === 0 ? ctx.moveTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r)
+                  : ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+        }
+        ctx.closePath();
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function miniCell(ctx, cx, cy) {
+        ctx.save();
+        ctx.globalAlpha = 0.6;
+        ctx.strokeStyle = '#f84';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 17, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function miniClone(ctx, cx, cy) {
+        const r = 14;
+        ctx.save();
+        ctx.globalAlpha = 0.35;
+        ctx.strokeStyle = '#8af';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (let i = 0; i < 3; i++) {
+          const a = (i / 3) * Math.PI * 2 - Math.PI / 2;
+          i === 0 ? ctx.moveTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r)
+                  : ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+        }
+        ctx.closePath();
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function miniNeutrophil(ctx, cx, cy) {
+        const outerR = 16, innerR = 7;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.beginPath();
+        for (let i = 0; i < 16; i++) {
+          const a = (i / 16) * Math.PI * 2 - Math.PI / 8;
+          const r = i % 2 === 0 ? outerR : innerR;
+          i === 0 ? ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r)
+                  : ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+        }
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(255, 215, 40, 0.5)';
+        ctx.strokeStyle = '#ffd428';
+        ctx.lineWidth = 1.5;
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function miniMacrophage(ctx, cx, cy) {
+        const N = 10, r = 15;
+        ctx.save();
+        ctx.translate(cx, cy);
+        const pts = Array.from({ length: N }, (_, i) => {
+          const a = (i / N) * Math.PI * 2;
+          const rr = r + Math.sin(i * 1.7) * 4;
+          return { x: Math.cos(a) * rr, y: Math.sin(a) * rr };
+        });
+        ctx.beginPath();
+        for (let i = 0; i < N; i++) {
+          const cur = pts[i], nxt = pts[(i + 1) % N];
+          const mx = (cur.x + nxt.x) / 2, my = (cur.y + nxt.y) / 2;
+          if (i === 0) ctx.moveTo(mx, my);
+          ctx.quadraticCurveTo(cur.x, cur.y, mx, my);
+        }
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(107, 142, 35, 0.55)';
+        ctx.fill();
+        ctx.strokeStyle = '#9acd32';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function miniTCell(ctx, cx, cy) {
+        const s = 13;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(Math.PI / 8);
+        ctx.beginPath();
+        ctx.rect(-s, -s, s * 2, s * 2);
+        ctx.strokeStyle = 'hsl(80, 70%, 50%)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.fillStyle = 'hsla(80, 70%, 50%, 0.08)';
+        ctx.fill();
+        ctx.restore();
+      }
+
+      const drawFns = {
+        player: miniPlayer, cell: miniCell, clone: miniClone,
+        neutrophil: miniNeutrophil, macrophage: miniMacrophage, tcell: miniTCell,
+      };
+
+      for (const canvas of document.querySelectorAll('#entity-key canvas[data-entity]')) {
+        const fn = drawFns[canvas.dataset.entity];
+        if (fn) fill(canvas, fn);
+      }
+    })();
+  </script>
 </body>
 </html>
