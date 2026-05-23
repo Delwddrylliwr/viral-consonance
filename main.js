@@ -73,7 +73,6 @@ const ALERT_THRESHOLD_MACRO_PLAYER = 0.8;
 
 let player, cells, committedCell, proteins, clones, playerVoice, cellVoice, cloneVoice;
 let macrophages, tcells, antibodies, neutrophils, bcells;
-let antibodySpawnTimer  = 15;
 let tcellRespawnTimer   = 0;
 let immuneAlertLevel = 0;
 let infectionFlash = 0;
@@ -156,7 +155,6 @@ function init() {
   antibodies         = [];
   neutrophils        = [];
   bcells             = [];
-  antibodySpawnTimer = 15;
   tcellRespawnTimer  = 0;
   immuneAlertLevel   = 0;
   dead               = false;
@@ -549,15 +547,6 @@ function loop(ts) {
     }
   }
 
-  // Antibodies: launched by B-cells above; also keep legacy timer as fallback when no B-cell exists
-  if (bcells.length === 0 && immuneAlertLevel >= ALERT_THRESHOLD_ANTIBODY) {
-    antibodySpawnTimer -= dt;
-    if (antibodySpawnTimer <= 0 && antibodies.filter(ab => !ab.attached).length < 2) {
-      const noteIdx = Math.floor(Math.random() * 3);
-      antibodies.push(new Antibody(...randomEdgePos(), noteIdx, ANTIBODY_FREQS[noteIdx]));
-      antibodySpawnTimer = 12 + Math.random() * 6;
-    }
-  }
 
   // Harder antibody shake-off: requires a more forceful direction reversal
   const hardShake = playerShook && Math.hypot(player.vx, player.vy) > 160;
