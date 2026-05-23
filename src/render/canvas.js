@@ -256,6 +256,9 @@ export function drawMacrophage(ctx, m, time) {
     const r = m.radius + off + Math.sin(time * 0.6 + i * 0.8) * 5;
     return { x: Math.cos(a) * r, y: Math.sin(a) * r };
   });
+  const eating = m.eatingPlayer;
+  const pulse  = eating ? 0.5 + 0.5 * Math.sin(time * 10) : 0;
+
   ctx.beginPath();
   for (let i = 0; i < N; i++) {
     const curr = pts[i], next = pts[(i + 1) % N];
@@ -264,10 +267,12 @@ export function drawMacrophage(ctx, m, time) {
     ctx.quadraticCurveTo(curr.x, curr.y, mx, my);
   }
   ctx.closePath();
-  ctx.fillStyle = 'rgba(107, 142, 35, 0.55)';
+  ctx.fillStyle = eating
+    ? `rgba(220, 50, 30, ${0.55 + pulse * 0.2})`
+    : 'rgba(107, 142, 35, 0.55)';
   ctx.fill();
-  ctx.strokeStyle = '#9acd32';
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = eating ? `rgba(255, 90, 60, ${0.8 + pulse * 0.2})` : '#9acd32';
+  ctx.lineWidth = eating ? 3 + pulse * 2 : 2;
   ctx.stroke();
 
   // Ghost triangles of ingested clones
@@ -292,27 +297,55 @@ export function drawMacrophage(ctx, m, time) {
 }
 
 // Slowly rotating square — 4-note motif at corners, visible when matchable (player fully loaded with proteins)
-export function drawTCell(ctx, tc, matchable = false) {
+// immuneAlert: 0–1 drives green→yellow→red colour shift plus visual intensity cues
+export function drawTCell(ctx, tc, matchable = false, immuneAlert = 0) {
+  // Base colour: green→yellow→red along alert level; purple overrides when vulnerable
+  const hue   = 120 - immuneAlert * 120;          // 120 (green) → 0 (red)
+  const sat   = 65 + immuneAlert * 25;             // 65% → 90%
+  const light = 55 - immuneAlert * 10;             // 55% → 45%
+  const alertColor = `hsl(${hue}, ${sat}%, ${light}%)`;
+
+  const strokeColor = matchable ? 'rgba(180, 80, 255, 0.9)' : alertColor;
+  const fillAlpha   = matchable ? 0.18 : 0.08 + immuneAlert * 0.14;
+  const lineW       = matchable ? 3 : 2 + immuneAlert * 2;
+
+  const s = tc.radius;
+
+  // Pulsing outer alert ring — intensity scales with immune alert
+  if (!matchable && immuneAlert > 0.05) {
+    ctx.save();
+    ctx.globalAlpha = immuneAlert * 0.55;
+    ctx.beginPath();
+    ctx.arc(tc.x, tc.y, s * 1.55 + immuneAlert * 6, 0, Math.PI * 2);
+    ctx.strokeStyle = alertColor;
+    ctx.lineWidth   = 1 + immuneAlert * 2;
+    ctx.stroke();
+    ctx.restore();
+  }
+
   ctx.save();
   ctx.translate(tc.x, tc.y);
   ctx.rotate(tc.angle);
-  const s = tc.radius;
   ctx.beginPath();
   ctx.rect(-s, -s, s * 2, s * 2);
-  ctx.strokeStyle = matchable ? 'rgba(180, 80, 255, 0.9)' : 'rgba(32, 178, 170, 0.8)';
-  ctx.lineWidth = matchable ? 3 : 2.5;
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth   = lineW;
   ctx.stroke();
-  ctx.fillStyle = matchable ? 'rgba(180, 80, 255, 0.18)' : 'rgba(32, 178, 170, 0.12)';
+  ctx.fillStyle = matchable
+    ? 'rgba(180, 80, 255, 0.18)'
+    : `hsla(${hue}, ${sat}%, ${light}%, ${fillAlpha})`;
   ctx.fill();
   ctx.restore();
 
-  // Motif notes at the 4 corners (always faint; bold when matchable)
+  // Motif notes at the 4 corners (faint at low alert; bold when matchable)
+  const noteAlpha = matchable ? 0.9 : Math.max(0.2, immuneAlert * 0.7);
+  const noteColor = matchable ? '#e0aaff' : alertColor;
   const dots = tc.getDots();
   for (const dot of dots) {
     ctx.save();
-    ctx.globalAlpha  = matchable ? 0.9 : 0.25;
+    ctx.globalAlpha  = noteAlpha;
     ctx.font         = `bold ${matchable ? 13 : 11}px sans-serif`;
-    ctx.fillStyle    = matchable ? '#e0aaff' : '#20b2aa';
+    ctx.fillStyle    = noteColor;
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(noteLabel(dot.freq), dot.x, dot.y);
@@ -412,7 +445,7 @@ export function drawAntibody(ctx, ab) {
   ctx.restore();
 }
 
-// Jittering star; glowing countdown arc when attached to a clone
+// Jittering 8-point star; glowing countdown arc when attached to a clone
 export function drawNeutrophil(ctx, n) {
   ctx.save();
   ctx.translate(n.x, n.y);
@@ -420,26 +453,59 @@ export function drawNeutrophil(ctx, n) {
   // Fuse countdown arc (unrotated, drawn before star rotation)
   if (n.attached && n.fuseBeats > 0) {
     ctx.beginPath();
-    ctx.arc(0, 0, n.radius + 5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (n.fuseBeats / 4), false);
+    ctx.arc(0, 0, n.radius + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (n.fuseBeats / 4), false);
     ctx.strokeStyle = '#ff6600';
-    ctx.lineWidth = 3;
+    ctx.lineWidth   = 2.5;
     ctx.stroke();
   }
 
   ctx.rotate(n.jitterAngle);
+
+  // 8-point star (outer/inner radius ratio matches macrophage spoke feel)
+  const outerR = n.radius;
+  const innerR = n.radius * 0.42;
   ctx.beginPath();
   for (let i = 0; i < 16; i++) {
     const a  = (i / 16) * Math.PI * 2 - Math.PI / 8;
-    const rr = i % 2 === 0 ? n.radius : n.radius * 0.45;
+    const rr = i % 2 === 0 ? outerR : innerR;
     if (i === 0) ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
     else ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
   }
   ctx.closePath();
-  ctx.fillStyle   = 'rgba(255, 220, 50, 0.65)';
-  ctx.strokeStyle = '#ffdd22';
+  ctx.fillStyle   = 'rgba(255, 215, 40, 0.5)';
+  ctx.strokeStyle = '#ffd428';
   ctx.lineWidth   = 1.5;
   ctx.fill();
   ctx.stroke();
 
+  // Inner circle core — consistent with circle-based entities
+  ctx.beginPath();
+  ctx.arc(0, 0, innerR * 0.85, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255, 235, 120, 0.55)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255, 215, 40, 0.6)';
+  ctx.lineWidth   = 1;
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+export function drawNeutrophilBlast(ctx, blast) {
+  const progress  = blast.maxRadius > 0 ? blast.radius / blast.maxRadius : 1;
+  const alpha     = Math.max(0, 0.9 - progress * 0.85);
+  const lineWidth = 2 + (1 - progress) * 10;
+  ctx.save();
+  ctx.translate(blast.x, blast.y);
+  ctx.shadowColor = '#ff8800';
+  ctx.shadowBlur  = 24;
+  ctx.beginPath();
+  ctx.arc(0, 0, Math.max(1, blast.radius), 0, Math.PI * 2);
+  ctx.strokeStyle = `rgba(255, 140, 20, ${alpha})`;
+  ctx.lineWidth   = lineWidth;
+  ctx.stroke();
+  ctx.shadowBlur  = 8;
+  ctx.strokeStyle = `rgba(255, 240, 120, ${alpha * 0.55})`;
+  ctx.lineWidth   = lineWidth * 0.35;
+  ctx.stroke();
   ctx.restore();
 }
