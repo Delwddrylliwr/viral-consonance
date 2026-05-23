@@ -267,6 +267,7 @@ export class Macrophage {
     this.consumeCount    = 0;
     this.maxConsumes     = 4; // dies after eating this many clones
     this.dead            = false;
+    this.rallyPoint      = null; // {x,y} — rush here before resuming normal behaviour
   }
 
   update(dt, clones, beatPhase, player, playerDissonance) {
@@ -275,6 +276,20 @@ export class Macrophage {
       this.y = player.y;
       return;
     }
+
+    // Summoned rally: beeline to the T-cell position before picking up normal targets
+    if (this.rallyPoint) {
+      const dx = this.rallyPoint.x - this.x, dy = this.rallyPoint.y - this.y;
+      const d  = Math.hypot(dx, dy) || 1;
+      if (d < 40) {
+        this.rallyPoint = null;
+      } else {
+        this.x += (dx / d) * this.speed * 1.6 * dt;
+        this.y += (dy / d) * this.speed * 1.6 * dt;
+        return;
+      }
+    }
+
     this.retargetTimer -= dt;
     if (this.retargetTimer <= 0) {
       // At high player dissonance, occasionally target the player instead of a clone

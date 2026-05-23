@@ -441,6 +441,12 @@ function loop(ts) {
           && tc.escalationCooldown <= 0) {
         immuneAlertLevel = Math.min(1.0, immuneAlertLevel + 0.4);
         tc.escalationCooldown = 8;
+        // Rally nearby macrophages to converge on the T-cell's position
+        for (const m of macrophages) {
+          if (!m.eatingPlayer && !m.targetingPlayer) {
+            m.rallyPoint = { x: tc.x, y: tc.y };
+          }
+        }
         break;
       }
     }
