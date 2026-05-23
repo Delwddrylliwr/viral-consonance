@@ -1,5 +1,6 @@
 import { initCanvas, clear, drawPlayer, drawCell, drawGlow, drawInfectionFlash, drawProtein, drawClone,
-         drawMacrophage, drawTCell, drawAntibody, drawNeutrophil, drawLetterBond, drawBCell } from './src/render/canvas.js';
+         drawMacrophage, drawTCell, drawAntibody, drawNeutrophil, drawLetterBond, drawBCell,
+         drawNeutrophilBlast } from './src/render/canvas.js';
 import { drawDebug } from './src/render/debug.js';
 import { DEBUG, state } from './src/game/state.js';
 import { startTransport, onBeat, getBPM, setTempo } from './src/audio/transport.js';
@@ -10,7 +11,7 @@ import { createPlayerVoice, createCellVoice, createCloneVoice, voiceCount,
   from './src/audio/synthesis.js';
 import { roughness, DEFAULT_TIMBRE } from './src/audio/consonance.js';
 import { PLAYER_CHORD } from './src/audio/scale.js';
-import { Player, Cell, Clone, Macrophage, TCell, Antibody, Neutrophil, BCell, angleDiff } from './src/game/entities.js';
+import { Player, Cell, Clone, Macrophage, TCell, Antibody, Neutrophil, BCell, NeutrophilBlast, angleDiff } from './src/game/entities.js';
 import { checkContact, bouncePlayer, spawnCell, INFECTION_THRESHOLD,
          checkContactProtein, spawnProtein }
   from './src/game/contact.js';
@@ -75,8 +76,14 @@ const ALERT_THRESHOLD_BCELL        = 0.6;
 const ALERT_THRESHOLD_NPHIL_PLAYER = 0.7;
 const ALERT_THRESHOLD_MACRO_PLAYER = 0.8;
 
+// Neutrophil blast wave: expands just below player terminal velocity (~200 px/s)
+const BLAST_SPEED              = 185;  // px/s
+const BLAST_RADIUS_BASE        = 80;   // min radius at low alert
+const BLAST_RADIUS_SCALE       = 420;  // additional radius at alert 1.0
+const BLAST_DISSONANCE_THRESH  = 0.05; // player roughness above which blast is lethal
+
 let player, cells, committedCell, proteins, clones, playerVoice, cellVoice, cloneVoice;
-let macrophages, tcells, antibodies, neutrophils, bcells;
+let macrophages, tcells, antibodies, neutrophils, bcells, blasts;
 let antibodySpawnTimer  = 15;
 let tcellRespawnTimer   = 0;
 let immuneAlertLevel = 0;
@@ -171,6 +178,7 @@ function init() {
   antibodies         = [];
   neutrophils        = [];
   bcells             = [];
+  blasts             = [];
   antibodySpawnTimer = 15;
   tcellRespawnTimer  = 0;
   immuneAlertLevel   = 0;
@@ -203,10 +211,11 @@ function init() {
       if (n.attachedToPlayer) {
         n.playerFuseBeats++;
         playNeutrophilTick(n.playerFuseBeats);
-        if (n.playerFuseBeats >= 3 && !dead) {
+        if (n.playerFuseBeats >= 3) {
           n.dead = true;
           playNeutrophilExplode();
-          triggerDeath();
+          const blastR = BLAST_RADIUS_BASE + BLAST_RADIUS_SCALE * immuneAlertLevel;
+          blasts.push(new NeutrophilBlast(n.x, n.y, blastR, BLAST_SPEED));
         }
       } else {
         n.fuseBeats++;
@@ -219,6 +228,8 @@ function init() {
           }
           n.dead = true;
           playNeutrophilExplode();
+          const blastR = BLAST_RADIUS_BASE + BLAST_RADIUS_SCALE * immuneAlertLevel;
+          blasts.push(new NeutrophilBlast(n.x, n.y, blastR, BLAST_SPEED));
         }
       }
     }
@@ -538,6 +549,32 @@ function loop(ts) {
     }
   }
 
+  // Blast wave update: expand ring, kill clones it sweeps through, kill dissonant player
+  for (const b of blasts) {
+    const prevRadius = b.radius;
+    b.update(dt);
+    // Ring sweeps through clones (iterate backwards to allow safe splice)
+    for (let i = clones.length - 1; i >= 0; i--) {
+      const d = Math.hypot(b.x - clones[i].x, b.y - clones[i].y);
+      if (d > prevRadius && d <= b.radius) {
+        clones.splice(i, 1);
+        setTempo(BASE_BPM + clones.length * BPM_PER_CLONE);
+      }
+    }
+    // Ring sweeps through player — lethal only if dissonant
+    if (!b.hitPlayer && !dead) {
+      const dPlayer = Math.hypot(b.x - player.x, b.y - player.y);
+      // Standard: ring swept past player this frame. Epicenter: player at/near blast origin (prevRadius==0).
+      const ringSweep  = dPlayer <= b.radius && dPlayer > prevRadius;
+      const atEpicenter = prevRadius === 0 && dPlayer < Math.max(6, b.radius);
+      if (ringSweep || atEpicenter) {
+        b.hitPlayer = true;
+        if (playerDissonance > BLAST_DISSONANCE_THRESH) triggerDeath();
+      }
+    }
+  }
+  blasts = blasts.filter(b => !b.dead);
+
   // B-cell management: persistent off-screen launchers gated at ALERT_THRESHOLD_BCELL
   if (bcells.filter(b => b.active).length < 1 && immuneAlertLevel >= ALERT_THRESHOLD_BCELL) {
     bcells.push(new BCell(...randomEdgePos()));
@@ -633,6 +670,7 @@ function loop(ts) {
     drawCell(ctx, c, cActiveFreq, cellAlpha);
   }
   for (const c of clones) drawClone(ctx, c);
+  for (const b of blasts) drawNeutrophilBlast(ctx, b);
   for (const m of macrophages) drawMacrophage(ctx, m, now);
   for (const tc of tcells) {
     const pn = player.getActiveNote(tc.x, tc.y);
