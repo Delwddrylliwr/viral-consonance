@@ -1,8 +1,7 @@
 import { initCanvas, clear, drawPlayer, drawCell, drawGlow, drawInfectionFlash, drawProtein, drawClone,
          drawMacrophage, drawTCell, drawAntibody, drawNeutrophil, drawLetterBond, drawBCell,
-         drawNeutrophilBlast } from './src/render/canvas.js';
-import { drawDebug } from './src/render/debug.js';
-import { DEBUG, state } from './src/game/state.js';
+         drawNeutrophilBlast, drawDangerBorder } from './src/render/canvas.js';
+import { state } from './src/game/state.js';
 import { startTransport, onBeat, getBPM, setTempo } from './src/audio/transport.js';
 import { createPlayerVoice, createCellVoice, createCloneVoice, voiceCount,
          resolutionCadence, dissonantStab, playMutationSound,
@@ -56,6 +55,7 @@ const PROTEIN_RANGE    = 800; // remove proteins that wander beyond this radius
 // BPM = BASE_BPM + clones.length * BPM_PER_CLONE  (viral load drives tempo)
 const BASE_BPM                 = 60;
 const BPM_PER_CLONE            = 5;
+const BPM_DANGER_MARGIN        = 5 * BPM_PER_CLONE; // border glow starts 5 clones above death
 const MAX_CLONES_PER_INFECTION = 3;
 const STARTER_CLONES           = 8; // gives 100 BPM at game start
 
@@ -683,7 +683,13 @@ function loop(ts) {
   ctx.restore();
 
   drawInfectionFlash(ctx, infectionFlash);
-  if (DEBUG) drawDebug(ctx, state);
+
+  // Screen-space danger border: deep red throb when BPM is critical, neutrophil is latched, or player is in blast radius
+  const bpmDanger    = Math.max(0, Math.min(1, 1 - (getBPM() - BASE_BPM) / BPM_DANGER_MARGIN));
+  const latchDanger  = neutrophils.some(n => n.attachedToPlayer) ? 1 : 0;
+  const blastDanger  = blasts.some(b => !b.dead && Math.hypot(b.x - player.x, b.y - player.y) <= b.maxRadius) ? 1 : 0;
+  const dangerIntensity = Math.max(bpmDanger, latchDanger, blastDanger);
+  drawDangerBorder(ctx, dangerIntensity, now);
 
   requestAnimationFrame(loop);
 }

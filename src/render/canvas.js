@@ -509,3 +509,21 @@ export function drawNeutrophilBlast(ctx, blast) {
   ctx.stroke();
   ctx.restore();
 }
+
+export function drawDangerBorder(ctx, intensity, now) {
+  if (intensity <= 0) return;
+  const w = ctx.canvas.width;
+  const h = ctx.canvas.height;
+  const rate  = 1.5 + 3.0 * intensity; // faster pulse at higher danger
+  const pulse = 0.5 + 0.5 * Math.sin(now * Math.PI * 2 * rate);
+  const alpha = intensity * (0.3 + 0.55 * pulse);
+  const pad   = 35;
+  ctx.save();
+  ctx.globalAlpha  = alpha;
+  ctx.shadowColor  = '#cc0000';
+  ctx.shadowBlur   = 100;
+  ctx.strokeStyle  = '#660000';
+  ctx.lineWidth    = pad * 2;
+  ctx.strokeRect(-pad, -pad, w + pad * 2, h + pad * 2);
+  ctx.restore();
+}
