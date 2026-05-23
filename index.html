@@ -19,22 +19,34 @@
     #entity-key {
       display: none;
       grid-template-columns: 1fr 1fr;
-      gap: 10px 32px;
-      font-size: 12px;
+      gap: 6px 14px;
+      font-size: 11px;
       color: #555;
       letter-spacing: 0.03em;
       margin-top: 4px;
     }
-    @media (min-height: 600px) and (min-width: 480px) {
+    @media (min-height: 480px) {
       #entity-key { display: grid; }
+    }
+    @media (min-height: 600px) and (min-width: 480px) {
+      #entity-key { gap: 10px 32px; font-size: 12px; }
+    }
+    .ek-desc { display: none; }
+    @media (min-height: 600px) and (min-width: 480px) {
+      .ek-desc { display: inline; }
     }
     .ek-item {
       display: flex;
       align-items: center;
-      gap: 9px;
-      white-space: nowrap;
+      gap: 6px;
     }
-    .ek-item canvas { flex-shrink: 0; }
+    @media (min-height: 600px) and (min-width: 480px) {
+      .ek-item { gap: 9px; white-space: nowrap; }
+    }
+    #entity-key canvas { width: 28px; height: 28px; flex-shrink: 0; }
+    @media (min-height: 600px) and (min-width: 480px) {
+      #entity-key canvas { width: 44px; height: 44px; }
+    }
   </style>
 </head>
 <body>
@@ -43,15 +55,15 @@
     <p>can you make some viral sounds?</p>
     <span>begin infection</span>
     <div id="entity-key">
-      <div class="ek-item"><canvas data-entity="player"   width="44" height="44"></canvas><span>you — the virus</span></div>
-      <div class="ek-item"><canvas data-entity="cell"     width="44" height="44"></canvas><span>cell — match notes to infect</span></div>
-      <div class="ek-item"><canvas data-entity="clone"    width="44" height="44"></canvas><span>clone — make more of these</span></div>
-      <div class="ek-item"><canvas data-entity="protein"  width="44" height="44"></canvas><span>complement protein — jams a note</span></div>
-      <div class="ek-item"><canvas data-entity="tcell"    width="44" height="44"></canvas><span>T-cell — hunts dissonant clones</span></div>
-      <div class="ek-item"><canvas data-entity="macrophage" width="44" height="44"></canvas><span>macrophage — eats your clones</span></div>
-      <div class="ek-item"><canvas data-entity="neutrophil" width="44" height="44"></canvas><span>neutrophil — keep clear of their blast</span></div>
-      <div class="ek-item"><canvas data-entity="antibody" width="44" height="44"></canvas><span>antibody — locks onto a chord note</span></div>
-      <div class="ek-item"><canvas data-entity="bcell"    width="44" height="44"></canvas><span>B-cell — launches antibodies</span></div>
+      <div class="ek-item"><canvas data-entity="player"   width="44" height="44"></canvas><span>you<span class="ek-desc"> — the virus</span></span></div>
+      <div class="ek-item"><canvas data-entity="cell"     width="44" height="44"></canvas><span>cell<span class="ek-desc"> — match notes to infect</span></span></div>
+      <div class="ek-item"><canvas data-entity="clone"    width="44" height="44"></canvas><span>clone<span class="ek-desc"> — make more of these</span></span></div>
+      <div class="ek-item"><canvas data-entity="protein"  width="44" height="44"></canvas><span>complement protein<span class="ek-desc"> — jams a note</span></span></div>
+      <div class="ek-item"><canvas data-entity="tcell"    width="44" height="44"></canvas><span>T-cell<span class="ek-desc"> — hunts dissonant clones</span></span></div>
+      <div class="ek-item"><canvas data-entity="macrophage" width="44" height="44"></canvas><span>macrophage<span class="ek-desc"> — eats your clones</span></span></div>
+      <div class="ek-item"><canvas data-entity="neutrophil" width="44" height="44"></canvas><span>neutrophil<span class="ek-desc"> — keep clear of their blast</span></span></div>
+      <div class="ek-item"><canvas data-entity="antibody" width="44" height="44"></canvas><span>antibody<span class="ek-desc"> — locks onto a chord note</span></span></div>
+      <div class="ek-item"><canvas data-entity="bcell"    width="44" height="44"></canvas><span>B-cell<span class="ek-desc"> — launches antibodies</span></span></div>
     </div>
   </div>
 
