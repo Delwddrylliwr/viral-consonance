@@ -95,6 +95,57 @@ let gameTime = 0;   // seconds of live play
 let bpmAccum = 0;   // ∫ BPM dt — divide by gameTime for average
 let maxViralLoad = 0;
 
+let leaderboardChecked = false;
+let showingNameInput = false;
+let finalLeaderboard = null;
+let newEntryIdx = -1;
+
+// --- leaderboard ---
+
+const LEADERBOARD_KEY  = 'viral_consonance_scores';
+const LEADERBOARD_SIZE = 10;
+
+function getLeaderboard() {
+  try { return JSON.parse(localStorage.getItem(LEADERBOARD_KEY) || '[]'); } catch { return []; }
+}
+
+function isTopScore(score) {
+  if (score === 0) return false;
+  const scores = getLeaderboard();
+  return scores.length < LEADERBOARD_SIZE || score > scores[scores.length - 1].score;
+}
+
+function saveScore(name, score) {
+  const scores = getLeaderboard();
+  const entry  = { name: (name.trim() || 'unknown').substring(0, 14), score };
+  scores.push(entry);
+  scores.sort((a, b) => b.score - a.score);
+  scores.splice(LEADERBOARD_SIZE);
+  localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(scores));
+  return { scores, idx: scores.indexOf(entry) };
+}
+
+function showNameInputOverlay() {
+  showingNameInput = true;
+  const overlay = document.getElementById('name-input-overlay');
+  const input   = document.getElementById('name-input-field');
+  const btn     = document.getElementById('name-submit-btn');
+  overlay.style.display = 'flex';
+  input.value = '';
+  setTimeout(() => input.focus(), 50);
+
+  function submit() {
+    const { scores, idx } = saveScore(input.value, maxViralLoad);
+    finalLeaderboard  = scores;
+    newEntryIdx       = idx;
+    overlay.style.display = 'none';
+    showingNameInput  = false;
+  }
+
+  btn.onclick       = submit;
+  input.onkeydown   = e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } };
+}
+
 // --- helpers ---
 
 function cellDist(c) { return Math.hypot(c.x - player.x, c.y - player.y); }
@@ -293,7 +344,7 @@ document.getElementById('start').addEventListener('click', async () => {
 
 // Restart after death
 window.addEventListener('pointerdown', () => {
-  if (dead && deathFade >= 1) location.reload();
+  if (dead && deathFade >= 1 && !showingNameInput) location.reload();
 });
 
 let last = 0;
@@ -311,21 +362,54 @@ function loop(ts) {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.restore();
     if (deathFade >= 0.95) {
+      if (!leaderboardChecked) {
+        leaderboardChecked = true;
+        if (isTopScore(maxViralLoad)) {
+          showNameInputOverlay();
+        } else {
+          finalLeaderboard = getLeaderboard();
+        }
+      }
       const avgBpm = Math.round(gameTime > 0 ? bpmAccum / gameTime : BASE_BPM);
+      const cx = canvas.width / 2;
+      const cy = canvas.height / 2;
       ctx.save();
+      ctx.textAlign = 'center';
       ctx.font = '20px monospace';
       ctx.fillStyle = '#aaa';
-      ctx.textAlign = 'center';
-      ctx.fillText('your infection has been contained', canvas.width / 2, canvas.height / 2 - 54);
+      ctx.fillText('your infection has been contained', cx, cy - 54);
       ctx.font = '26px monospace';
       ctx.fillStyle = '#888';
-      ctx.textAlign = 'center';
-      ctx.fillText(`max viral load  ${maxViralLoad}`, canvas.width / 2, canvas.height / 2 - 28);
+      ctx.fillText(`max viral load  ${maxViralLoad}`, cx, cy - 28);
       ctx.font = '20px monospace';
-      ctx.fillText(`(avg ${avgBpm} BPM)`, canvas.width / 2, canvas.height / 2 - 2);
-      ctx.font = '15px monospace';
-      ctx.fillStyle = '#444';
-      ctx.fillText('click to restart', canvas.width / 2, canvas.height / 2 + 18);
+      ctx.fillText(`(avg ${avgBpm} BPM)`, cx, cy - 2);
+
+      if (finalLeaderboard !== null && finalLeaderboard.length > 0) {
+        ctx.font = '12px monospace';
+        ctx.fillStyle = '#3d3d3d';
+        ctx.fillText('top viral loads', cx, cy + 22);
+        for (let i = 0; i < finalLeaderboard.length; i++) {
+          const e   = finalLeaderboard[i];
+          const ey  = cy + 37 + i * 15;
+          ctx.font      = '11px monospace';
+          ctx.fillStyle = i === newEntryIdx ? '#5af' : '#383838';
+          ctx.textAlign = 'right';
+          ctx.fillText(`${i + 1}.`, cx - 74, ey);
+          ctx.textAlign = 'left';
+          ctx.fillText(e.name.substring(0, 14), cx - 64, ey);
+          ctx.textAlign = 'right';
+          ctx.fillText(String(e.score), cx + 90, ey);
+        }
+        ctx.textAlign = 'center';
+        ctx.font      = '13px monospace';
+        ctx.fillStyle = '#2e2e2e';
+        ctx.fillText('click to restart', cx, cy + 40 + finalLeaderboard.length * 15);
+      } else if (!showingNameInput) {
+        ctx.font      = '15px monospace';
+        ctx.fillStyle = '#444';
+        ctx.fillText('click to restart', cx, cy + 18);
+      }
+
       ctx.restore();
     }
     requestAnimationFrame(loop);
