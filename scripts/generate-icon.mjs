@@ -5,50 +5,42 @@ import { dirname, join }  from 'path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-// ── geometry ────────────────────────────────────────────────────────────────
+// ── geometry ──────────────────────────────────────────────────────────────────
 const cx = 256, cy = 256;
-const baseR   = 130;   // virus circle radius
-const amp     = 10;    // oscillation amplitude (±10 px)
-const freq    = 8;     // full oscillations per revolution
-const dblGap  = 13;    // gap (px) for the doubled inner line
-const N       = 1440;  // 0.25° per sample → smooth
+const baseR  = 85;    // virus radius — smaller now there's no clef inside
+const amp    = 10;    // oscillation ±10 px
+const freq   = 4;     // 4 oscillations/rev, matching 4 spikes
+const dblGap = 14;    // radial gap between doubled semiquaver lines
+const N      = 1440;  // 0.25° per sample
 
-// ── stave rings (background, outside the virus body) ────────────────────────
-// 5 concentric circles as a circular stave.  Spacing is symmetric: 12 px at
-// the edges, 18 px adjacent to the middle ring.  The middle ring (r=206) sits
-// exactly at the note-head radius, so the 8 spike quavers lie on the stave.
-const ringRadii = [176, 188, 206, 224, 236];
+// ── stave rings ───────────────────────────────────────────────────────────────
+// Symmetric: 10 px tight spacing at edges, 18 px wide gap flanking the middle
+// ring.  Middle ring (r=136) is at the note-head radius, so each quaver sits
+// on the staff's central line with two bracket lines either side.
+const staveRadii = [108, 118, 136, 154, 164];
 
-// ── oscillating boundary path ───────────────────────────────────────────────
-// r(t) = baseR + amp·sin(freq·t)
-// Zero-crossings of sin(8t) land exactly at the 8 spike positions (multiples
-// of π/4), so spikes sit on the neutral radius.  Peaks and troughs fall
-// between spikes.
+// ── oscillating boundary ──────────────────────────────────────────────────────
+// sin(4t) is zero exactly at the 4 spike angles (t = π/4, 3π/4, 5π/4, 7π/4),
+// so spikes emerge from the neutral radius and peaks fall between spikes.
 function buildBoundaryPath() {
   const pts = [];
   for (let i = 0; i <= N; i++) {
     const t = (2 * Math.PI * i) / N;
     const r = baseR + amp * Math.sin(freq * t);
-    pts.push(
-      `${i === 0 ? 'M' : 'L'}${(cx + r * Math.cos(t)).toFixed(2)},${(cy + r * Math.sin(t)).toFixed(2)}`
-    );
+    pts.push(`${i === 0 ? 'M' : 'L'}${(cx + r * Math.cos(t)).toFixed(2)},${(cy + r * Math.sin(t)).toFixed(2)}`);
   }
   return pts.join(' ') + ' Z';
 }
 
-// ── doubled inner line (outward-bulge arcs only → semiquaver suggestion) ────
-// Drawn wherever sin(freq·t) > 0 (the outward half-cycles between spikes).
-// Gap of dblGap px keeps both lines visually distinct.
+// ── doubled inner arcs (outward half-cycles → semiquaver visual) ──────────────
 function buildDoubledPath() {
   let d = '', open = false;
   for (let i = 0; i <= N; i++) {
-    const t   = (2 * Math.PI * i) / N;
-    const sn  = Math.sin(freq * t);
-    if (sn > 0.07) {           // small threshold avoids artefacts at crossings
+    const t  = (2 * Math.PI * i) / N;
+    const sn = Math.sin(freq * t);
+    if (sn > 0.07) {
       const r = baseR + amp * sn - dblGap;
-      const x = (cx + r * Math.cos(t)).toFixed(2);
-      const y = (cy + r * Math.sin(t)).toFixed(2);
-      d += `${open ? 'L' : 'M'}${x},${y} `;
+      d += `${open ? 'L' : 'M'}${(cx + r * Math.cos(t)).toFixed(2)},${(cy + r * Math.sin(t)).toFixed(2)} `;
       open = true;
     } else {
       open = false;
@@ -60,39 +52,35 @@ function buildDoubledPath() {
 const boundaryPath = buildBoundaryPath();
 const doubledPath  = buildDoubledPath();
 
-const staveRings = ringRadii.map(r =>
-  `  <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#ff7722" stroke-width="2" opacity="0.65"/>`
+const staveRings = staveRadii.map(r =>
+  `  <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#ff7722" stroke-width="2.5" opacity="0.70"/>`
 ).join('\n');
 
-// ── spike: stem pointing up, note-head fully to the left of the stem ────────
+// ── 4 spikes — short stems, bold heads, radiating to the four corners ─────────
+// Each spike sits on the circle at 45°/135°/225°/315° (the diagonal positions).
+// baseR / √2 ≈ 60.1 px offset along each axis.
+const d45 = baseR / Math.SQRT2;   // ≈ 60.1
+
 const spikeGroup = `
     <g id="spike">
-      <line x1="0" y1="0" x2="0" y2="-76" stroke="#44aaff" stroke-width="5" stroke-linecap="round"/>
-      <ellipse cx="-13" cy="-76" rx="16" ry="10" transform="rotate(-25,-13,-76)" fill="#44aaff"/>
+      <line x1="0" y1="0" x2="0" y2="-50" stroke="#44aaff" stroke-width="6" stroke-linecap="round"/>
+      <ellipse cx="-15" cy="-50" rx="20" ry="13" transform="rotate(-25,-15,-50)" fill="#44aaff"/>
     </g>`;
 
-// 8 spikes at 45° intervals; translate = point on circle edge, rotate = outward direction
 const spikePlacements = [
-  [256, 126,   0],
-  [347.9, 164.1, 45],
-  [386,   256,   90],
-  [347.9, 347.9, 135],
-  [256,   386,   180],
-  [164.1, 347.9, 225],
-  [126,   256,   270],
-  [164.1, 164.1, 315],
+  [cx + d45, cy - d45,  45],   // → top-right corner
+  [cx + d45, cy + d45, 135],   // → bottom-right corner
+  [cx - d45, cy + d45, 225],   // → bottom-left corner
+  [cx - d45, cy - d45, 315],   // → top-left corner
 ].map(([tx, ty, rot]) =>
-  `    <use xlink:href="#spike" href="#spike" transform="translate(${tx},${ty}) rotate(${rot})"/>`
+  `    <use xlink:href="#spike" href="#spike" transform="translate(${tx.toFixed(1)},${ty.toFixed(1)}) rotate(${rot})"/>`
 ).join('\n');
 
-// ── bass clef ────────────────────────────────────────────────────────────────
-const clefFontSize = 127;
-const clefY        = 295;
-
+// ── SVG ───────────────────────────────────────────────────────────────────────
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512">
   <defs>
     <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
-      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feGaussianBlur stdDeviation="4" result="blur"/>
       <feMerge>
         <feMergeNode in="blur"/>
         <feMergeNode in="SourceGraphic"/>
@@ -104,37 +92,28 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.
   <!-- Background -->
   <rect width="512" height="512" rx="88" fill="#0d0d14"/>
 
-  <!-- Virus body fill (uses oscillating boundary as shape) -->
-  <path d="${boundaryPath}" fill="#04111c" stroke="none"/>
-
-  <!-- Circular stave — 5 neon-orange rings in background; spikes drawn on top -->
+  <!-- Circular stave — 5 neon-orange rings; middle ring at note-head radius -->
 ${staveRings}
 
-  <!-- 8 note-head spikes -->
+  <!-- Virus body fill -->
+  <path d="${boundaryPath}" fill="#04111c" stroke="none"/>
+
+  <!-- 4 quaver spikes radiating toward the four corners -->
   <g filter="url(#glow)">
 ${spikePlacements}
   </g>
 
-  <!-- Oscillating boundary — outer stroke with glow -->
-  <path d="${boundaryPath}" fill="none" stroke="#44aaff" stroke-width="5" filter="url(#glow)"/>
+  <!-- Oscillating boundary — bold cyan with glow -->
+  <path d="${boundaryPath}" fill="none" stroke="#44aaff" stroke-width="7" filter="url(#glow)"/>
 
-  <!-- Doubled inner arcs (outward-bulge sections → semiquaver visual) -->
-  <path d="${doubledPath}" fill="none" stroke="#44aaff" stroke-width="3.5" opacity="0.88"/>
-
-  <!-- Bass clef -->
-  <text x="${cx}" y="${clefY}"
-        text-anchor="middle"
-        font-size="${clefFontSize}"
-        fill="#44aaff"
-        font-family="FreeSerif, serif"
-        filter="url(#glow)">𝄢</text>
+  <!-- Doubled inner arcs (semiquaver sections) -->
+  <path d="${doubledPath}" fill="none" stroke="#44aaff" stroke-width="5" opacity="0.90"/>
 </svg>`;
 
-// ── write SVG ────────────────────────────────────────────────────────────────
+// ── output ────────────────────────────────────────────────────────────────────
 writeFileSync(join(root, 'icon.svg'), svg, 'utf8');
 console.log('Wrote icon.svg');
 
-// ── generate PNGs ────────────────────────────────────────────────────────────
 const sizes = [
   { size: 512, name: 'icon-512.png'        },
   { size: 192, name: 'icon-192.png'        },
