@@ -117,8 +117,6 @@ ${spikePlacements}
   <!-- Oscillating boundary — bold cyan with glow -->
   <path d="${boundaryPath}" fill="none" stroke="#44aaff" stroke-width="10" filter="url(#glow)"/>
 
-  <!-- Doubled inner arcs (semiquaver sections) -->
-  <path d="${doubledPath}" fill="none" stroke="#44aaff" stroke-width="7" opacity="0.90"/>
 
   <!-- Downward-pointing white triangle in foreground; V-sides bolder than top edge -->
   <polygon points="${triL} ${triR} ${triBot}" fill="none" stroke="white" stroke-width="18" stroke-linejoin="round"/>
