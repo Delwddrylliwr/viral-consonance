@@ -639,5 +639,13 @@ export class BCell {
 
     this.x += (moveX / mLen) * spd * dt;
     this.y += (moveY / mLen) * spd * dt;
+
+    // Clamp to screen edge so antibodies don't spawn beyond the 1500px cull distance
+    const maxDist = Math.hypot(screenHalfW, screenHalfH) + 80;
+    const curDist = Math.hypot(this.x - player.x, this.y - player.y) || 1;
+    if (curDist > maxDist) {
+      this.x = player.x + (this.x - player.x) * maxDist / curDist;
+      this.y = player.y + (this.y - player.y) * maxDist / curDist;
+    }
   }
 }
