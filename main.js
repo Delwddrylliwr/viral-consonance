@@ -102,27 +102,14 @@ let newEntryIdx = -1;
 
 // --- leaderboard ---
 
-const LEADERBOARD_KEY  = 'viral_consonance_scores';
 const LEADERBOARD_SIZE = 10;
 
-function getLeaderboard() {
-  try { return JSON.parse(localStorage.getItem(LEADERBOARD_KEY) || '[]'); } catch { return []; }
-}
-
-function isTopScore(score) {
-  if (score === 0) return false;
-  const scores = getLeaderboard();
-  return scores.length < LEADERBOARD_SIZE || score > scores[scores.length - 1].score;
-}
-
-function saveScore(name, score) {
-  const scores = getLeaderboard();
-  const entry  = { name: (name.trim() || 'unknown').substring(0, 14), score };
-  scores.push(entry);
-  scores.sort((a, b) => b.score - a.score);
-  scores.splice(LEADERBOARD_SIZE);
-  localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(scores));
-  return { scores, idx: scores.indexOf(entry) };
+async function fetchLeaderboard() {
+  try {
+    const res = await fetch('/api/scores');
+    if (!res.ok) return [];
+    return res.json();
+  } catch { return []; }
 }
 
 function showNameInputOverlay() {
@@ -134,16 +121,27 @@ function showNameInputOverlay() {
   input.value = '';
   setTimeout(() => input.focus(), 50);
 
-  function submit() {
-    const { scores, idx } = saveScore(input.value, maxViralLoad);
-    finalLeaderboard  = scores;
-    newEntryIdx       = idx;
+  async function submit() {
+    btn.disabled    = true;
+    btn.textContent = 'saving…';
+    try {
+      const res  = await fetch('/api/scores', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ name: input.value, score: maxViralLoad }),
+      });
+      const data = await res.json();
+      finalLeaderboard = data.scores;
+      newEntryIdx      = data.idx;
+    } catch {
+      finalLeaderboard = [];
+    }
     overlay.style.display = 'none';
-    showingNameInput  = false;
+    showingNameInput = false;
   }
 
-  btn.onclick       = submit;
-  input.onkeydown   = e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } };
+  btn.onclick     = submit;
+  input.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } };
 }
 
 // --- helpers ---
@@ -344,7 +342,7 @@ document.getElementById('start').addEventListener('click', async () => {
 
 // Restart after death
 window.addEventListener('pointerdown', () => {
-  if (dead && deathFade >= 1 && !showingNameInput) location.reload();
+  if (dead && deathFade >= 1 && !showingNameInput && finalLeaderboard !== null) location.reload();
 });
 
 let last = 0;
@@ -364,11 +362,16 @@ function loop(ts) {
     if (deathFade >= 0.95) {
       if (!leaderboardChecked) {
         leaderboardChecked = true;
-        if (isTopScore(maxViralLoad)) {
-          showNameInputOverlay();
-        } else {
-          finalLeaderboard = getLeaderboard();
-        }
+        fetchLeaderboard().then(scores => {
+          const qualifies = maxViralLoad > 0
+            && (scores.length < LEADERBOARD_SIZE
+                || maxViralLoad > (scores[scores.length - 1]?.score ?? -1));
+          if (qualifies) {
+            showNameInputOverlay();
+          } else {
+            finalLeaderboard = scores;
+          }
+        });
       }
       const avgBpm = Math.round(gameTime > 0 ? bpmAccum / gameTime : BASE_BPM);
       const cx = canvas.width / 2;
@@ -404,7 +407,7 @@ function loop(ts) {
         ctx.font      = '13px monospace';
         ctx.fillStyle = '#2e2e2e';
         ctx.fillText('click to restart', cx, cy + 40 + finalLeaderboard.length * 15);
-      } else if (!showingNameInput) {
+      } else if (finalLeaderboard !== null && !showingNameInput) {
         ctx.font      = '15px monospace';
         ctx.fillStyle = '#444';
         ctx.fillText('click to restart', cx, cy + 18);
