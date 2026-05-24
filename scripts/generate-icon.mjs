@@ -9,7 +9,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const cx = 256, cy = 256;
 const baseR  = 128;   // 85 × 1.5
 const amp    = 15;    // 10 × 1.5 — oscillation ±15 px
-const freq   = 3;
+const freq   = 6;
 const dblGap = 25;    // 14 × ~1.5 — gap between doubled lines
 const N      = 1440;
 
