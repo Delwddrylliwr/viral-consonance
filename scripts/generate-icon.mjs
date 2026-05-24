@@ -13,9 +13,11 @@ const freq    = 8;     // full oscillations per revolution
 const dblGap  = 13;    // gap (px) for the doubled inner line
 const N       = 1440;  // 0.25° per sample → smooth
 
-// ── concentric rings inside the virus body ───────────────────────────────────
-// 5 evenly-spaced rings, spacing = 22 px, outermost at r=110 (20 px inside min boundary)
-const ringRadii = [22, 44, 66, 88, 110];
+// ── stave rings (background, outside the virus body) ────────────────────────
+// 5 concentric circles as a circular stave.  Spacing is symmetric: 12 px at
+// the edges, 18 px adjacent to the middle ring.  The middle ring (r=206) sits
+// exactly at the note-head radius, so the 8 spike quavers lie on the stave.
+const ringRadii = [176, 188, 206, 224, 236];
 
 // ── oscillating boundary path ───────────────────────────────────────────────
 // r(t) = baseR + amp·sin(freq·t)
@@ -58,8 +60,8 @@ function buildDoubledPath() {
 const boundaryPath = buildBoundaryPath();
 const doubledPath  = buildDoubledPath();
 
-const concentricRings = ringRadii.map(r =>
-  `  <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#ff7722" stroke-width="2" opacity="0.58"/>`
+const staveRings = ringRadii.map(r =>
+  `  <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#ff7722" stroke-width="2" opacity="0.65"/>`
 ).join('\n');
 
 // ── spike: stem pointing up, note-head fully to the left of the stem ────────
@@ -83,10 +85,9 @@ const spikePlacements = [
   `    <use xlink:href="#spike" href="#spike" transform="translate(${tx},${ty}) rotate(${rot})"/>`
 ).join('\n');
 
-// ── treble clef ──────────────────────────────────────────────────────────────
-// +10% taller (115 → 127), +5% higher (baseline up ~6 px: 308 → 302)
+// ── bass clef ────────────────────────────────────────────────────────────────
 const clefFontSize = 127;
-const clefY        = 302;
+const clefY        = 295;
 
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512">
   <defs>
@@ -106,8 +107,8 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.
   <!-- Virus body fill (uses oscillating boundary as shape) -->
   <path d="${boundaryPath}" fill="#04111c" stroke="none"/>
 
-  <!-- Concentric rings — faint neon orange, suggesting viral capsid layers -->
-${concentricRings}
+  <!-- Circular stave — 5 neon-orange rings in background; spikes drawn on top -->
+${staveRings}
 
   <!-- 8 note-head spikes -->
   <g filter="url(#glow)">
@@ -120,13 +121,13 @@ ${spikePlacements}
   <!-- Doubled inner arcs (outward-bulge sections → semiquaver visual) -->
   <path d="${doubledPath}" fill="none" stroke="#44aaff" stroke-width="3.5" opacity="0.88"/>
 
-  <!-- Treble clef -->
+  <!-- Bass clef -->
   <text x="${cx}" y="${clefY}"
         text-anchor="middle"
         font-size="${clefFontSize}"
         fill="#44aaff"
         font-family="FreeSerif, serif"
-        filter="url(#glow)">𝄞</text>
+        filter="url(#glow)">𝄢</text>
 </svg>`;
 
 // ── write SVG ────────────────────────────────────────────────────────────────
