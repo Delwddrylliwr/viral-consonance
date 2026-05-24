@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="88" fill="#0d0d14"/>
+
+  <!-- Stave — neon orange -->
+  <line x1="46" y1="182" x2="488" y2="182" stroke="#ff7722" stroke-width="9"/>
+  <line x1="46" y1="222" x2="488" y2="222" stroke="#ff7722" stroke-width="9"/>
+  <line x1="46" y1="262" x2="488" y2="262" stroke="#ff7722" stroke-width="9"/>
+  <line x1="46" y1="302" x2="488" y2="302" stroke="#ff7722" stroke-width="9"/>
+  <line x1="46" y1="342" x2="488" y2="342" stroke="#ff7722" stroke-width="9"/>
+
+  <!-- Bass clef — neon blue -->
+  <text x="48" y="338" font-family="FreeSerif" font-size="178" fill="#44aaff">𝄢</text>
+
+  <!-- Quaver: hollow downward-triangle head -->
+  <polygon points="343.0,242.9 409.0,242.9 376,300.1" fill="none" stroke="white" stroke-width="13" stroke-linejoin="round"/>
+
+  <!-- Quaver: stem -->
+  <line x1="409.0" y1="242.9" x2="409.0" y2="114" stroke="white" stroke-width="12" stroke-linecap="round"/>
+
+  <!-- Quaver: flag -->
+  <path d="M 409.0 114 C 477.0 128 485.0 188 427.0 222" fill="none" stroke="white" stroke-width="12" stroke-linecap="round"/>
+</svg>
