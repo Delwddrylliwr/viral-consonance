@@ -11,7 +11,7 @@ const staveY  = [40, 148, 256, 364, 472];
 const staveX1 = 36, staveX2 = 476;
 
 const staveLines = staveY.map(y =>
-  `  <line x1="${staveX1}" y1="${y}" x2="${staveX2}" y2="${y}" stroke="#ff7722" stroke-width="24"/>`
+  `  <line x1="${staveX1}" y1="${y}" x2="${staveX2}" y2="${y}" stroke="#ff7722" stroke-width="36"/>`
 ).join('\n');
 
 // ── minim: hollow left-pointing triangle spanning stave lines 1–3 from bottom ──
@@ -46,10 +46,10 @@ ${staveLines}
   <ellipse cx="175" cy="${staveY[1]}" rx="58" ry="70" transform="rotate(-20,175,${staveY[1]})" fill="#0d0d14"/>
 
   <!-- Minim: hollow left-pointing triangle head on 2nd-lowest stave line -->
-  <polygon points="${ptTip} ${ptTR} ${ptBR}" fill="none" stroke="white" stroke-width="30" stroke-linejoin="round"/>
+  <polygon points="${ptTip} ${ptTR} ${ptBR}" fill="none" stroke="white" stroke-width="44" stroke-linejoin="round"/>
 
   <!-- Minim: stem from top-right corner to top stave line -->
-  <line x1="${stemX.toFixed(1)}" y1="${stemY0.toFixed(1)}" x2="${stemX.toFixed(1)}" y2="${stemY1}" stroke="white" stroke-width="26" stroke-linecap="round"/>
+  <line x1="${stemX.toFixed(1)}" y1="${stemY0.toFixed(1)}" x2="${stemX.toFixed(1)}" y2="${stemY1}" stroke="white" stroke-width="38" stroke-linecap="round"/>
 </svg>`;
 
 // ── output ────────────────────────────────────────────────────────────────────
