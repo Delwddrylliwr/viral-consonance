@@ -7,16 +7,16 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 // ── geometry ──────────────────────────────────────────────────────────────────
 const cx = 256, cy = 256;
-const baseR  = 128;   // 85 × 1.5
-const amp    = 15;    // 10 × 1.5 — oscillation ±15 px
+const baseR  = 155;   // expanded so note heads land between rings 4 & 5
+const amp    = 18;    // oscillation ±18 px (proportional to baseR)
 const freq   = 6;
-const dblGap = 25;    // 14 × ~1.5 — gap between doubled lines
+const dblGap = 30;    // gap between doubled lines (proportional)
 const N      = 1440;
 
 // ── stave rings ───────────────────────────────────────────────────────────────
 // Evenly spaced at 48 px intervals.  Rings 1–2 (r=60, r=108) sit inside the
-// virus body; rings 3–5 (r=156, r=204, r=252) surround it.  The 4th ring
-// (r=204) aligns with the note-head radius so the quavers sit on it.
+// virus body; rings 3–5 (r=156, r=204, r=252) surround it.  Note heads now
+// land at r≈231, between rings 4 (r=204) and 5 (r=252).
 const staveRadii = [60, 108, 156, 204, 252];
 
 // ── oscillating boundary ──────────────────────────────────────────────────────
@@ -53,7 +53,7 @@ const boundaryPath = buildBoundaryPath();
 const doubledPath  = buildDoubledPath();
 
 const staveRings = staveRadii.map(r =>
-  `  <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#ff7722" stroke-width="3.5" opacity="0.70"/>`
+  `  <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#ff7722" stroke-width="6" opacity="0.70"/>`
 ).join('\n');
 
 // ── downward-pointing triangle ────────────────────────────────────────────────
