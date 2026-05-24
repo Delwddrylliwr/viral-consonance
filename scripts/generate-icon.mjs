@@ -10,12 +10,12 @@ const cx = 256, cy = 256;
 const baseR   = 130;   // virus circle radius
 const amp     = 10;    // oscillation amplitude (±10 px)
 const freq    = 8;     // full oscillations per revolution
-const dblGap  = 7;     // gap (px) for the doubled inner line
+const dblGap  = 13;    // gap (px) for the doubled inner line
 const N       = 1440;  // 0.25° per sample → smooth
 
-// ── concentric rings inside the virus body (replace staff lines) ────────────
-// 4 evenly-spaced rings at r = 26, 52, 78, 104 (spacing = baseR/5 = 26 px)
-const ringRadii = [26, 52, 78, 104];
+// ── concentric rings inside the virus body ───────────────────────────────────
+// 5 evenly-spaced rings, spacing = 22 px, outermost at r=110 (20 px inside min boundary)
+const ringRadii = [22, 44, 66, 88, 110];
 
 // ── oscillating boundary path ───────────────────────────────────────────────
 // r(t) = baseR + amp·sin(freq·t)
@@ -59,7 +59,7 @@ const boundaryPath = buildBoundaryPath();
 const doubledPath  = buildDoubledPath();
 
 const concentricRings = ringRadii.map(r =>
-  `  <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#ff7722" stroke-width="1.5" opacity="0.35"/>`
+  `  <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#ff7722" stroke-width="2" opacity="0.58"/>`
 ).join('\n');
 
 // ── spike: stem pointing up, note-head fully to the left of the stem ────────
