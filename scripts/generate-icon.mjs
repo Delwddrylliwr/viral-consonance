@@ -56,6 +56,16 @@ const staveRings = staveRadii.map(r =>
   `  <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#ff7722" stroke-width="3.5" opacity="0.70"/>`
 ).join('\n');
 
+// ── downward-pointing triangle ────────────────────────────────────────────────
+// Equilateral triangle inscribed in r=90, vertex at the bottom.
+// V-sides (left + right) drawn with a thicker white stroke to suggest a V.
+const R_tri   = 90;
+const triTopY = cy - R_tri / 2;                 // 211
+const triDx   = R_tri * Math.sqrt(3) / 2;       // 77.9
+const triL    = `${(cx - triDx).toFixed(1)},${triTopY.toFixed(1)}`;
+const triR    = `${(cx + triDx).toFixed(1)},${triTopY.toFixed(1)}`;
+const triBot  = `${cx},${cy + R_tri}`;
+
 // ── 4 spikes — short stems, bold heads, radiating to the four corners ─────────
 const d45 = baseR / Math.SQRT2;   // ≈ 90.5
 
@@ -96,6 +106,11 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.
   <!-- Circular stave — 5 neon-orange rings drawn after fill so inner rings
        show against the dark virus body; outer rings show on the background -->
 ${staveRings}
+
+  <!-- Downward-pointing white triangle; V-sides thicker to suggest a V -->
+  <polygon points="${triL} ${triR} ${triBot}" fill="white" opacity="0.92"/>
+  <line x1="${(cx - triDx).toFixed(1)}" y1="${triTopY.toFixed(1)}" x2="${cx}" y2="${cy + R_tri}" stroke="white" stroke-width="8" stroke-linecap="round"/>
+  <line x1="${(cx + triDx).toFixed(1)}" y1="${triTopY.toFixed(1)}" x2="${cx}" y2="${cy + R_tri}" stroke="white" stroke-width="8" stroke-linecap="round"/>
 
   <!-- 4 quaver spikes radiating toward the four corners -->
   <g filter="url(#glow)">
