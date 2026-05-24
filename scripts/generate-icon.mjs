@@ -7,17 +7,17 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 // ── geometry ──────────────────────────────────────────────────────────────────
 const cx = 256, cy = 256;
-const baseR  = 85;    // virus radius — smaller now there's no clef inside
-const amp    = 10;    // oscillation ±10 px
-const freq   = 4;     // 4 oscillations/rev, matching 4 spikes
-const dblGap = 14;    // radial gap between doubled semiquaver lines
-const N      = 1440;  // 0.25° per sample
+const baseR  = 128;   // 85 × 1.5
+const amp    = 15;    // 10 × 1.5 — oscillation ±15 px
+const freq   = 4;
+const dblGap = 25;    // 14 × ~1.5 — gap between doubled lines
+const N      = 1440;
 
 // ── stave rings ───────────────────────────────────────────────────────────────
-// Symmetric: 10 px tight spacing at edges, 18 px wide gap flanking the middle
-// ring.  Middle ring (r=136) is at the note-head radius, so each quaver sits
-// on the staff's central line with two bracket lines either side.
-const staveRadii = [108, 118, 136, 154, 164];
+// Evenly spaced at 48 px intervals.  Rings 1–2 (r=60, r=108) sit inside the
+// virus body; rings 3–5 (r=156, r=204, r=252) surround it.  The 4th ring
+// (r=204) aligns with the note-head radius so the quavers sit on it.
+const staveRadii = [60, 108, 156, 204, 252];
 
 // ── oscillating boundary ──────────────────────────────────────────────────────
 // sin(4t) is zero exactly at the 4 spike angles (t = π/4, 3π/4, 5π/4, 7π/4),
@@ -53,18 +53,16 @@ const boundaryPath = buildBoundaryPath();
 const doubledPath  = buildDoubledPath();
 
 const staveRings = staveRadii.map(r =>
-  `  <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#ff7722" stroke-width="2.5" opacity="0.70"/>`
+  `  <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#ff7722" stroke-width="3.5" opacity="0.70"/>`
 ).join('\n');
 
 // ── 4 spikes — short stems, bold heads, radiating to the four corners ─────────
-// Each spike sits on the circle at 45°/135°/225°/315° (the diagonal positions).
-// baseR / √2 ≈ 60.1 px offset along each axis.
-const d45 = baseR / Math.SQRT2;   // ≈ 60.1
+const d45 = baseR / Math.SQRT2;   // ≈ 90.5
 
 const spikeGroup = `
     <g id="spike">
-      <line x1="0" y1="0" x2="0" y2="-50" stroke="#44aaff" stroke-width="6" stroke-linecap="round"/>
-      <ellipse cx="-15" cy="-50" rx="20" ry="13" transform="rotate(-25,-15,-50)" fill="#44aaff"/>
+      <line x1="0" y1="0" x2="0" y2="-75" stroke="#44aaff" stroke-width="9" stroke-linecap="round"/>
+      <ellipse cx="-23" cy="-75" rx="30" ry="20" transform="rotate(-25,-23,-75)" fill="#44aaff"/>
     </g>`;
 
 const spikePlacements = [
@@ -92,11 +90,12 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.
   <!-- Background -->
   <rect width="512" height="512" rx="88" fill="#0d0d14"/>
 
-  <!-- Circular stave — 5 neon-orange rings; middle ring at note-head radius -->
-${staveRings}
-
   <!-- Virus body fill -->
   <path d="${boundaryPath}" fill="#04111c" stroke="none"/>
+
+  <!-- Circular stave — 5 neon-orange rings drawn after fill so inner rings
+       show against the dark virus body; outer rings show on the background -->
+${staveRings}
 
   <!-- 4 quaver spikes radiating toward the four corners -->
   <g filter="url(#glow)">
@@ -104,10 +103,10 @@ ${spikePlacements}
   </g>
 
   <!-- Oscillating boundary — bold cyan with glow -->
-  <path d="${boundaryPath}" fill="none" stroke="#44aaff" stroke-width="7" filter="url(#glow)"/>
+  <path d="${boundaryPath}" fill="none" stroke="#44aaff" stroke-width="10" filter="url(#glow)"/>
 
   <!-- Doubled inner arcs (semiquaver sections) -->
-  <path d="${doubledPath}" fill="none" stroke="#44aaff" stroke-width="5" opacity="0.90"/>
+  <path d="${doubledPath}" fill="none" stroke="#44aaff" stroke-width="7" opacity="0.90"/>
 </svg>`;
 
 // ── output ────────────────────────────────────────────────────────────────────
