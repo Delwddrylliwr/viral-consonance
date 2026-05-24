@@ -608,7 +608,7 @@ export class BCell {
     if (this.flashTimer > 0) this.flashTimer = Math.max(0, this.flashTimer - dt);
 
     // Adaptive learning: reset familiarity when player chord changes (mutation occurred)
-    const chordKey = player.chord.join(',');
+    const chordKey = player.baseChord.join(',');
     if (this.knownChord !== chordKey) {
       if (this.knownChord !== null) this.familiarity = 0;
       this.knownChord = chordKey;
