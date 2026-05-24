@@ -41,7 +41,7 @@
 
 
   <!-- Downward-pointing white triangle in foreground; V-sides bolder than top edge -->
-  <polygon points="190.0,188.5 322.0,188.5 256,391" fill="none" stroke="white" stroke-width="18" stroke-linejoin="round"/>
-  <line x1="190.0" y1="188.5" x2="256" y2="391" stroke="white" stroke-width="27" stroke-linecap="round"/>
-  <line x1="322.0" y1="188.5" x2="256" y2="391" stroke="white" stroke-width="27" stroke-linecap="round"/>
+  <polygon points="157.0,155.0 355.0,155.0 256,458" fill="none" stroke="white" stroke-width="18" stroke-linejoin="round"/>
+  <line x1="157.0" y1="155.0" x2="256" y2="458" stroke="white" stroke-width="27" stroke-linecap="round"/>
+  <line x1="355.0" y1="155.0" x2="256" y2="458" stroke="white" stroke-width="27" stroke-linecap="round"/>
 </svg>
