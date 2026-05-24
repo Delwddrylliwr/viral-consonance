@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512">
+  <defs>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- One spike: stem pointing up from origin, note head at tip -->
+    <g id="spike">
+      <line x1="0" y1="0" x2="0" y2="-68" stroke="#44aaff" stroke-width="5" stroke-linecap="round"/>
+      <ellipse cx="0" cy="-68" rx="16" ry="10" transform="rotate(-25, 0, -68)" fill="#44aaff"/>
+    </g>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="88" fill="#0d0d14"/>
+
+  <!-- Virus body -->
+  <circle cx="256" cy="256" r="130" fill="#04111c" stroke="#44aaff" stroke-width="6" filter="url(#glow)"/>
+
+  <!-- 8 note-head spikes radiating outward, each 45° apart             -->
+  <!-- translate = point on circle edge; rotate = outward angle         -->
+  <g filter="url(#glow)">
+    <use xlink:href="#spike" href="#spike" transform="translate(256,126)   rotate(0)"/>
+    <use xlink:href="#spike" href="#spike" transform="translate(347.9,164.1) rotate(45)"/>
+    <use xlink:href="#spike" href="#spike" transform="translate(386,256)   rotate(90)"/>
+    <use xlink:href="#spike" href="#spike" transform="translate(347.9,347.9) rotate(135)"/>
+    <use xlink:href="#spike" href="#spike" transform="translate(256,386)   rotate(180)"/>
+    <use xlink:href="#spike" href="#spike" transform="translate(164.1,347.9) rotate(225)"/>
+    <use xlink:href="#spike" href="#spike" transform="translate(126,256)   rotate(270)"/>
+    <use xlink:href="#spike" href="#spike" transform="translate(164.1,164.1) rotate(315)"/>
+  </g>
+
+  <!-- Bass clef (𝄢) centred inside the virus body -->
+  <text x="256" y="283"
+        text-anchor="middle"
+        font-size="145"
+        fill="#44aaff"
+        font-family="FreeSerif, serif"
+        filter="url(#glow)">𝄢</text>
+</svg>
