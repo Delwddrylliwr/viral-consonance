@@ -105,11 +105,9 @@ let newEntryIdx = -1;
 const LEADERBOARD_SIZE = 10;
 
 async function fetchLeaderboard() {
-  try {
-    const res = await fetch('/api/scores');
-    if (!res.ok) return [];
-    return res.json();
-  } catch { return []; }
+  const res = await fetch('/api/scores'); // let network errors throw
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
 }
 
 function showNameInputOverlay() {
@@ -371,6 +369,8 @@ function loop(ts) {
           } else {
             finalLeaderboard = scores;
           }
+        }).catch(() => {
+          finalLeaderboard = []; // server unreachable — skip prompt, unblock restart
         });
       }
       const avgBpm = Math.round(gameTime > 0 ? bpmAccum / gameTime : BASE_BPM);
@@ -389,13 +389,13 @@ function loop(ts) {
 
       if (finalLeaderboard !== null && finalLeaderboard.length > 0) {
         ctx.font = '12px monospace';
-        ctx.fillStyle = '#3d3d3d';
+        ctx.fillStyle = '#555';
         ctx.fillText('top viral loads', cx, cy + 22);
         for (let i = 0; i < finalLeaderboard.length; i++) {
           const e   = finalLeaderboard[i];
           const ey  = cy + 37 + i * 15;
           ctx.font      = '11px monospace';
-          ctx.fillStyle = i === newEntryIdx ? '#5af' : '#383838';
+          ctx.fillStyle = i === newEntryIdx ? '#5af' : '#4a4a4a';
           ctx.textAlign = 'right';
           ctx.fillText(`${i + 1}.`, cx - 74, ey);
           ctx.textAlign = 'left';
@@ -405,7 +405,7 @@ function loop(ts) {
         }
         ctx.textAlign = 'center';
         ctx.font      = '13px monospace';
-        ctx.fillStyle = '#2e2e2e';
+        ctx.fillStyle = '#444';
         ctx.fillText('click to restart', cx, cy + 40 + finalLeaderboard.length * 15);
       } else if (finalLeaderboard !== null && !showingNameInput) {
         ctx.font      = '15px monospace';
