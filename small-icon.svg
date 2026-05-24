@@ -9,9 +9,13 @@
   <line x1="36" y1="364" x2="476" y2="364" stroke="#ff7722" stroke-width="16"/>
   <line x1="36" y1="472" x2="476" y2="472" stroke="#ff7722" stroke-width="16"/>
 
+  <!-- Semibreve: hollow oval on 2nd stave line from top (neon blue) -->
+  <ellipse cx="100" cy="148" rx="56" ry="35" fill="#44aaff"/>
+  <ellipse cx="100" cy="148" rx="34" ry="20" transform="rotate(-20,100,148)" fill="#0d0d14"/>
+
   <!-- Minim: hollow left-pointing triangle head on 2nd-lowest stave line -->
-  <polygon points="165.3,364 352.4,256.0 352.4,472.0" fill="none" stroke="white" stroke-width="20" stroke-linejoin="round"/>
+  <polygon points="205.3,364 392.4,256.0 392.4,472.0" fill="none" stroke="white" stroke-width="20" stroke-linejoin="round"/>
 
   <!-- Minim: stem from top-right corner to top stave line -->
-  <line x1="352.4" y1="256.0" x2="352.4" y2="40" stroke="white" stroke-width="18" stroke-linecap="round"/>
+  <line x1="392.4" y1="256.0" x2="392.4" y2="40" stroke="white" stroke-width="18" stroke-linecap="round"/>
 </svg>

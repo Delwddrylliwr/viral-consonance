@@ -20,7 +20,7 @@ const staveLines = staveY.map(y =>
 const halfS   = (staveY[4] - staveY[2]) / 2;   // 108 — half the vertical span
 const triSide = halfS * 2;                      // 216
 const triH    = triSide * Math.sqrt(3) / 2;    // ≈ 187.1
-const triCx   = 290, triCy = staveY[3];         // centroid on 2nd-lowest line
+const triCx   = 330, triCy = staveY[3];         // centroid on 2nd-lowest line
 
 const tipX    = triCx - (2 * triH) / 3;         // left tip x ≈ 165
 const baseX   = triCx + triH / 3;               // right base x ≈ 352
@@ -40,6 +40,10 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
 
   <!-- Stave — neon orange -->
 ${staveLines}
+
+  <!-- Semibreve: hollow oval on 2nd stave line from top (neon blue) -->
+  <ellipse cx="100" cy="${staveY[1]}" rx="56" ry="35" fill="#44aaff"/>
+  <ellipse cx="100" cy="${staveY[1]}" rx="34" ry="20" transform="rotate(-20,100,${staveY[1]})" fill="#0d0d14"/>
 
   <!-- Minim: hollow left-pointing triangle head on 2nd-lowest stave line -->
   <polygon points="${ptTip} ${ptTR} ${ptBR}" fill="none" stroke="white" stroke-width="20" stroke-linejoin="round"/>
