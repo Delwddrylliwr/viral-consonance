@@ -121,7 +121,7 @@ ${spikePlacements}
   <path d="${doubledPath}" fill="none" stroke="#44aaff" stroke-width="7" opacity="0.90"/>
 
   <!-- Downward-pointing white triangle in foreground; V-sides bolder than top edge -->
-  <polygon points="${triL} ${triR} ${triBot}" fill="none" stroke="white" stroke-width="9" stroke-linejoin="round"/>
+  <polygon points="${triL} ${triR} ${triBot}" fill="none" stroke="white" stroke-width="18" stroke-linejoin="round"/>
   <line x1="${(cx - triTopDx).toFixed(1)}" y1="${triTopY.toFixed(1)}" x2="${cx}" y2="${cy + R_tri}" stroke="white" stroke-width="27" stroke-linecap="round"/>
   <line x1="${(cx + triTopDx).toFixed(1)}" y1="${triTopY.toFixed(1)}" x2="${cx}" y2="${cy + R_tri}" stroke="white" stroke-width="27" stroke-linecap="round"/>
 </svg>`;
