@@ -13,16 +13,9 @@ const freq    = 8;     // full oscillations per revolution
 const dblGap  = 7;     // gap (px) for the doubled inner line
 const N       = 1440;  // 0.25° per sample → smooth
 
-// ── staff lines (5-line stave, line-spacing = 20 px, top-to-bottom) ────────
-// Line 5 (top) … Line 1 (bottom)
-const staffSpacing = 20;
-const staffYs = [-2, -1, 0, 1, 2].map(n => cy + n * staffSpacing);
-// → [216, 236, 256, 276, 296]
-
-function staffEndpoints(y) {
-  const hw = Math.sqrt(baseR * baseR - (y - cy) ** 2);
-  return { x1: cx - hw, x2: cx + hw };
-}
+// ── concentric rings inside the virus body (replace staff lines) ────────────
+// 4 evenly-spaced rings at r = 26, 52, 78, 104 (spacing = baseR/5 = 26 px)
+const ringRadii = [26, 52, 78, 104];
 
 // ── oscillating boundary path ───────────────────────────────────────────────
 // r(t) = baseR + amp·sin(freq·t)
@@ -65,11 +58,9 @@ function buildDoubledPath() {
 const boundaryPath = buildBoundaryPath();
 const doubledPath  = buildDoubledPath();
 
-const staffLines = staffYs.map(y => {
-  const { x1, x2 } = staffEndpoints(y);
-  return `  <line x1="${x1.toFixed(1)}" y1="${y}" x2="${x2.toFixed(1)}" y2="${y}"`
-       + ` stroke="#ff7722" stroke-width="1.5" opacity="0.38"/>`;
-}).join('\n');
+const concentricRings = ringRadii.map(r =>
+  `  <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#ff7722" stroke-width="1.5" opacity="0.35"/>`
+).join('\n');
 
 // ── spike: stem pointing up, note-head fully to the left of the stem ────────
 const spikeGroup = `
@@ -92,11 +83,10 @@ const spikePlacements = [
   `    <use xlink:href="#spike" href="#spike" transform="translate(${tx},${ty}) rotate(${rot})"/>`
 ).join('\n');
 
-// ── treble clef: centred in the circle, aligned with the stave ──────────────
-// FreeSerif 𝄞: empirically, font-size 115 keeps the glyph within the circle;
-// baseline at y ≈ 308 centres the visual mass near cy=256.
-const clefFontSize = 115;
-const clefY        = 308;
+// ── treble clef ──────────────────────────────────────────────────────────────
+// +10% taller (115 → 127), +5% higher (baseline up ~6 px: 308 → 302)
+const clefFontSize = 127;
+const clefY        = 302;
 
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512">
   <defs>
@@ -116,8 +106,8 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.
   <!-- Virus body fill (uses oscillating boundary as shape) -->
   <path d="${boundaryPath}" fill="#04111c" stroke="none"/>
 
-  <!-- Staff lines — faint neon orange, endpoints clipped to circle radius -->
-${staffLines}
+  <!-- Concentric rings — faint neon orange, suggesting viral capsid layers -->
+${concentricRings}
 
   <!-- 8 note-head spikes -->
   <g filter="url(#glow)">
