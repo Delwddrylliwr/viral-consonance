@@ -42,8 +42,8 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
 ${staveLines}
 
   <!-- Semibreve: spans staveY[0]–staveY[2] vertically (ry=108), neon blue -->
-  <ellipse cx="95" cy="${staveY[1]}" rx="100" ry="108" fill="#44aaff"/>
-  <ellipse cx="95" cy="${staveY[1]}" rx="58" ry="70" transform="rotate(-20,95,${staveY[1]})" fill="#0d0d14"/>
+  <ellipse cx="175" cy="${staveY[1]}" rx="100" ry="108" fill="#44aaff"/>
+  <ellipse cx="175" cy="${staveY[1]}" rx="58" ry="70" transform="rotate(-20,175,${staveY[1]})" fill="#0d0d14"/>
 
   <!-- Minim: hollow left-pointing triangle head on 2nd-lowest stave line -->
   <polygon points="${ptTip} ${ptTR} ${ptBR}" fill="none" stroke="white" stroke-width="30" stroke-linejoin="round"/>
