@@ -66,6 +66,7 @@ const ANTIBODY_FREQS = [369.99, 466.16, 554.37];
 // Dissonance thresholds for escalating immune response
 const ALERT_THRESHOLD_NEUTROPHIL   = 0.2;
 const ALERT_THRESHOLD_MACROPHAGE   = 0.3;
+const ALERT_THRESHOLD_ANTIBODY     = 0.45;
 const ALERT_THRESHOLD_BCELL        = 0.6;
 const ALERT_THRESHOLD_NPHIL_PLAYER = 0.7;
 const ALERT_THRESHOLD_MACRO_PLAYER = 0.8;
@@ -527,7 +528,9 @@ function loop(ts) {
   for (const bc of bcells) {
     bc.update(dt, player, canvas.width / 2, canvas.height / 2);
     // Launch antibodies from this B-cell (replaces freestanding antibody timer)
-    if (bc.launchTimer <= 0 && antibodies.filter(ab => !ab.attached).length < 2) {
+    const playerNearBCell = Math.hypot(bc.x - player.x, bc.y - player.y) < 300;
+    if (bc.launchTimer <= 0 && (immuneAlertLevel >= ALERT_THRESHOLD_ANTIBODY || playerNearBCell)
+        && antibodies.filter(ab => !ab.attached).length < 2) {
       const noteIdx = Math.floor(Math.random() * 3);
       antibodies.push(new Antibody(bc.x, bc.y, noteIdx, ANTIBODY_FREQS[noteIdx]));
       bc.launchTimer = bc.getSpawnInterval() * (0.85 + Math.random() * 0.3);
