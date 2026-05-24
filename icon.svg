@@ -7,10 +7,11 @@
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
-    <!-- One spike: stem pointing up from origin, note head at tip -->
+    <!-- One spike: stem pointing up from origin; head fully to the left of stem -->
+    <!-- so stem enters the right edge of the head, matching standard note anatomy -->
     <g id="spike">
-      <line x1="0" y1="0" x2="0" y2="-68" stroke="#44aaff" stroke-width="5" stroke-linecap="round"/>
-      <ellipse cx="0" cy="-68" rx="16" ry="10" transform="rotate(-25, 0, -68)" fill="#44aaff"/>
+      <line x1="0" y1="0" x2="0" y2="-76" stroke="#44aaff" stroke-width="5" stroke-linecap="round"/>
+      <ellipse cx="-13" cy="-76" rx="16" ry="10" transform="rotate(-25, -13, -76)" fill="#44aaff"/>
     </g>
   </defs>
 
@@ -34,9 +35,9 @@
   </g>
 
   <!-- Bass clef (𝄢) centred inside the virus body -->
-  <text x="256" y="283"
+  <text x="256" y="305"
         text-anchor="middle"
-        font-size="145"
+        font-size="168"
         fill="#44aaff"
         font-family="FreeSerif, serif"
         filter="url(#glow)">𝄢</text>
