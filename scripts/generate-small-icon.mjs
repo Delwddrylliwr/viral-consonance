@@ -11,19 +11,19 @@ const staveY  = [40, 148, 256, 364, 472];
 const staveX1 = 36, staveX2 = 476;
 
 const staveLines = staveY.map(y =>
-  `  <line x1="${staveX1}" y1="${y}" x2="${staveX2}" y2="${y}" stroke="#ff7722" stroke-width="9"/>`
+  `  <line x1="${staveX1}" y1="${y}" x2="${staveX2}" y2="${y}" stroke="#ff7722" stroke-width="16"/>`
 ).join('\n');
 
-// ── minim: hollow left-pointing triangle on 2nd-lowest stave line (y=364) ────
-// Equilateral triangle pointing left.
-// Centroid at (triCx, triCy); tip at left, base edge vertical on the right.
-const triSide = 84;
-const triH    = triSide * Math.sqrt(3) / 2;   // ≈ 72.75
-const triCx   = 260, triCy = staveY[3];        // second-lowest line
+// ── minim: hollow left-pointing triangle spanning stave lines 1–3 from bottom ──
+// Base edge runs from staveY[2] (3rd from bottom) to staveY[4] (bottom line).
+// Centroid sits on staveY[3] (2nd-lowest line).
+const halfS   = (staveY[4] - staveY[2]) / 2;   // 108 — half the vertical span
+const triSide = halfS * 2;                      // 216
+const triH    = triSide * Math.sqrt(3) / 2;    // ≈ 187.1
+const triCx   = 290, triCy = staveY[3];         // centroid on 2nd-lowest line
 
-const tipX    = triCx - (2 * triH) / 3;        // left tip x ≈ 211.5
-const baseX   = triCx + triH / 3;              // right base x ≈ 284.25
-const halfS   = triSide / 2;                   // 42
+const tipX    = triCx - (2 * triH) / 3;         // left tip x ≈ 165
+const baseX   = triCx + triH / 3;               // right base x ≈ 352
 
 const ptTip   = `${tipX.toFixed(1)},${triCy}`;
 const ptTR    = `${baseX.toFixed(1)},${(triCy - halfS).toFixed(1)}`;
@@ -42,10 +42,10 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
 ${staveLines}
 
   <!-- Minim: hollow left-pointing triangle head on 2nd-lowest stave line -->
-  <polygon points="${ptTip} ${ptTR} ${ptBR}" fill="none" stroke="white" stroke-width="13" stroke-linejoin="round"/>
+  <polygon points="${ptTip} ${ptTR} ${ptBR}" fill="none" stroke="white" stroke-width="20" stroke-linejoin="round"/>
 
   <!-- Minim: stem from top-right corner to top stave line -->
-  <line x1="${stemX.toFixed(1)}" y1="${stemY0.toFixed(1)}" x2="${stemX.toFixed(1)}" y2="${stemY1}" stroke="white" stroke-width="12" stroke-linecap="round"/>
+  <line x1="${stemX.toFixed(1)}" y1="${stemY0.toFixed(1)}" x2="${stemX.toFixed(1)}" y2="${stemY1}" stroke="white" stroke-width="18" stroke-linecap="round"/>
 </svg>`;
 
 // ── output ────────────────────────────────────────────────────────────────────
