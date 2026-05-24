@@ -59,9 +59,9 @@ const staveRings = staveRadii.map(r =>
 // ── downward-pointing triangle ────────────────────────────────────────────────
 // Narrow isosceles triangle — short top edge, long V-sides pointing down.
 // triTopDx controls how wide the top edge is (smaller = more V-like).
-const R_tri    = 90;
-const triTopY  = cy - R_tri / 2;                // 211
-const triTopDx = 44;                            // narrow top edge (vs full ~78)
+const R_tri    = 135;
+const triTopY  = cy - R_tri / 2;                // 188.5
+const triTopDx = 66;                            // narrow top edge (vs full ~117)
 const triDx    = R_tri * Math.sqrt(3) / 2;      // 77.9 — used for V-side lines
 const triL     = `${(cx - triTopDx).toFixed(1)},${triTopY.toFixed(1)}`;
 const triR     = `${(cx + triTopDx).toFixed(1)},${triTopY.toFixed(1)}`;
