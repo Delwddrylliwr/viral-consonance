@@ -108,7 +108,7 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.
 ${staveRings}
 
   <!-- Downward-pointing white triangle; V-sides thicker to suggest a V -->
-  <polygon points="${triL} ${triR} ${triBot}" fill="white" opacity="0.92"/>
+  <polygon points="${triL} ${triR} ${triBot}" fill="none" stroke="white" stroke-width="4" stroke-linejoin="round"/>
   <line x1="${(cx - triDx).toFixed(1)}" y1="${triTopY.toFixed(1)}" x2="${cx}" y2="${cy + R_tri}" stroke="white" stroke-width="8" stroke-linecap="round"/>
   <line x1="${(cx + triDx).toFixed(1)}" y1="${triTopY.toFixed(1)}" x2="${cx}" y2="${cy + R_tri}" stroke="white" stroke-width="8" stroke-linecap="round"/>
 
