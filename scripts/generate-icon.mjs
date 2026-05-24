@@ -109,11 +109,6 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.
        show against the dark virus body; outer rings show on the background -->
 ${staveRings}
 
-  <!-- Downward-pointing white triangle; V-sides bolder than top edge -->
-  <polygon points="${triL} ${triR} ${triBot}" fill="none" stroke="white" stroke-width="9" stroke-linejoin="round"/>
-  <line x1="${(cx - triTopDx).toFixed(1)}" y1="${triTopY.toFixed(1)}" x2="${cx}" y2="${cy + R_tri}" stroke="white" stroke-width="27" stroke-linecap="round"/>
-  <line x1="${(cx + triTopDx).toFixed(1)}" y1="${triTopY.toFixed(1)}" x2="${cx}" y2="${cy + R_tri}" stroke="white" stroke-width="27" stroke-linecap="round"/>
-
   <!-- 4 quaver spikes radiating toward the four corners -->
   <g filter="url(#glow)">
 ${spikePlacements}
@@ -124,6 +119,11 @@ ${spikePlacements}
 
   <!-- Doubled inner arcs (semiquaver sections) -->
   <path d="${doubledPath}" fill="none" stroke="#44aaff" stroke-width="7" opacity="0.90"/>
+
+  <!-- Downward-pointing white triangle in foreground; V-sides bolder than top edge -->
+  <polygon points="${triL} ${triR} ${triBot}" fill="none" stroke="white" stroke-width="9" stroke-linejoin="round"/>
+  <line x1="${(cx - triTopDx).toFixed(1)}" y1="${triTopY.toFixed(1)}" x2="${cx}" y2="${cy + R_tri}" stroke="white" stroke-width="27" stroke-linecap="round"/>
+  <line x1="${(cx + triTopDx).toFixed(1)}" y1="${triTopY.toFixed(1)}" x2="${cx}" y2="${cy + R_tri}" stroke="white" stroke-width="27" stroke-linecap="round"/>
 </svg>`;
 
 // ── output ────────────────────────────────────────────────────────────────────
