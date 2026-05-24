@@ -109,9 +109,9 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.
 ${staveRings}
 
   <!-- Downward-pointing white triangle; V-sides bolder than top edge -->
-  <polygon points="${triL} ${triR} ${triBot}" fill="none" stroke="white" stroke-width="6" stroke-linejoin="round"/>
-  <line x1="${(cx - triTopDx).toFixed(1)}" y1="${triTopY.toFixed(1)}" x2="${cx}" y2="${cy + R_tri}" stroke="white" stroke-width="13" stroke-linecap="round"/>
-  <line x1="${(cx + triTopDx).toFixed(1)}" y1="${triTopY.toFixed(1)}" x2="${cx}" y2="${cy + R_tri}" stroke="white" stroke-width="13" stroke-linecap="round"/>
+  <polygon points="${triL} ${triR} ${triBot}" fill="none" stroke="white" stroke-width="3" stroke-linejoin="round"/>
+  <line x1="${(cx - triTopDx).toFixed(1)}" y1="${triTopY.toFixed(1)}" x2="${cx}" y2="${cy + R_tri}" stroke="white" stroke-width="18" stroke-linecap="round"/>
+  <line x1="${(cx + triTopDx).toFixed(1)}" y1="${triTopY.toFixed(1)}" x2="${cx}" y2="${cy + R_tri}" stroke="white" stroke-width="18" stroke-linecap="round"/>
 
   <!-- 4 quaver spikes radiating toward the four corners -->
   <g filter="url(#glow)">
