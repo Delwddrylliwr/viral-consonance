@@ -676,7 +676,8 @@ function loop(ts) {
   for (const bc of bcells) {
     bc.update(dt, player, canvas.width / 2, canvas.height / 2);
     // Launch antibodies from this B-cell (replaces freestanding antibody timer)
-    if (bc.launchTimer <= 0 && immuneAlertLevel >= ALERT_THRESHOLD_ANTIBODY
+    const playerNearBCell = Math.hypot(bc.x - player.x, bc.y - player.y) < 300;
+    if (bc.launchTimer <= 0 && (immuneAlertLevel >= ALERT_THRESHOLD_ANTIBODY || playerNearBCell)
         && antibodies.filter(ab => !ab.attached).length < 2) {
       const noteIdx = Math.floor(Math.random() * 3);
       antibodies.push(new Antibody(bc.x, bc.y, noteIdx, ANTIBODY_FREQS[noteIdx]));

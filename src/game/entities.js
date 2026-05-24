@@ -454,9 +454,9 @@ export class Antibody {
     this.attached      = false;
     this.attachAngle   = 0;
     this.vx = 0; this.vy = 0;
-    this.maxSpeed    = 200;  // px/s — faster pursuit
-    this.accel       = 380;  // px/s² toward player
-    this.maxTurnRate = Math.PI * 1.6; // rad/s — tighter tracking
+    this.maxSpeed    = 240;  // px/s — faster pursuit
+    this.accel       = 420;  // px/s² toward player
+    this.maxTurnRate = Math.PI * 2.0; // rad/s — tighter tracking
   }
 
   update(dt, player) {
