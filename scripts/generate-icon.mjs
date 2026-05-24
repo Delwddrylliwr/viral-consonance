@@ -68,7 +68,8 @@ const triR     = `${(cx + triTopDx).toFixed(1)},${triTopY.toFixed(1)}`;
 const triBot   = `${cx},${cy + R_tri}`;
 
 // ── 4 spikes — short stems, bold heads, radiating to the four corners ─────────
-const d45 = baseR / Math.SQRT2;   // ≈ 90.5
+const d45    = baseR / Math.SQRT2;   // ≈ 109.6 — outer pair (heads on r≈231)
+const d45_in = 128   / Math.SQRT2;  // ≈ 90.5  — inner pair (heads on r≈204)
 
 const spikeGroup = `
     <g id="spike">
@@ -77,10 +78,10 @@ const spikeGroup = `
     </g>`;
 
 const spikePlacements = [
-  [cx + d45, cy - d45,  45],   // → top-right corner
-  [cx + d45, cy + d45, 135],   // → bottom-right corner
-  [cx - d45, cy + d45, 225],   // → bottom-left corner
-  [cx - d45, cy - d45, 315],   // → top-left corner
+  [cx + d45,    cy - d45,     45],   // top-right   — outer (r≈231)
+  [cx + d45_in, cy + d45_in, 135],  // bottom-right — inner (r≈204)
+  [cx - d45,    cy + d45,    225],   // bottom-left  — outer (r≈231)
+  [cx - d45_in, cy - d45_in, 315],  // top-left     — inner (r≈204)
 ].map(([tx, ty, rot]) =>
   `    <use xlink:href="#spike" href="#spike" transform="translate(${tx.toFixed(1)},${ty.toFixed(1)}) rotate(${rot})"/>`
 ).join('\n');
@@ -109,7 +110,7 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.
 ${staveRings}
 
   <!-- Downward-pointing white triangle; V-sides bolder than top edge -->
-  <polygon points="${triL} ${triR} ${triBot}" fill="none" stroke="white" stroke-width="3" stroke-linejoin="round"/>
+  <polygon points="${triL} ${triR} ${triBot}" fill="none" stroke="white" stroke-width="6" stroke-linejoin="round"/>
   <line x1="${(cx - triTopDx).toFixed(1)}" y1="${triTopY.toFixed(1)}" x2="${cx}" y2="${cy + R_tri}" stroke="white" stroke-width="18" stroke-linecap="round"/>
   <line x1="${(cx + triTopDx).toFixed(1)}" y1="${triTopY.toFixed(1)}" x2="${cx}" y2="${cy + R_tri}" stroke="white" stroke-width="18" stroke-linecap="round"/>
 
