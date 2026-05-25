@@ -267,10 +267,13 @@ export class Macrophage {
     this.consumeCount    = 0;
     this.maxConsumes     = 4; // dies after eating this many clones
     this.dead            = false;
+    this.burstTimer      = 0;
     this.rallyPoint      = null; // {x,y} — rush here before resuming normal behaviour
   }
 
   update(dt, clones, beatPhase, player, playerDissonance) {
+    this.burstTimer = Math.max(0, this.burstTimer - dt);
+    const spd = this.burstTimer > 0 ? this.speed * 1.8 : this.speed;
     if (this.eatingPlayer && player) {
       this.x = player.x;
       this.y = player.y;
@@ -310,20 +313,20 @@ export class Macrophage {
       const dx = player.x - this.x, dy = player.y - this.y;
       const d  = Math.hypot(dx, dy) || 1;
       const onBeat     = beatPhase < 0.2;
-      const lateralAmt = onBeat ? 0 : Math.sin(Date.now() / 550) * 38;
+      const lateralAmt = this.burstTimer > 0 ? 0 : (onBeat ? 0 : Math.sin(Date.now() / 550) * 38);
       const perp       = { x: -dy / d, y: dx / d };
-      this.x += (dx / d * this.speed + perp.x * lateralAmt) * dt;
-      this.y += (dy / d * this.speed + perp.y * lateralAmt) * dt;
+      this.x += (dx / d * spd + perp.x * lateralAmt) * dt;
+      this.y += (dy / d * spd + perp.y * lateralAmt) * dt;
     } else if (this.target && clones.includes(this.target)) {
       const dx = this.target.x - this.x;
       const dy = this.target.y - this.y;
       const d  = Math.hypot(dx, dy) || 1;
       // On beat (beatPhase < 0.2): seek directly. Off-beat: orbit laterally.
       const onBeat     = beatPhase < 0.2;
-      const lateralAmt = onBeat ? 0 : Math.sin(Date.now() / 550) * 38;
+      const lateralAmt = this.burstTimer > 0 ? 0 : (onBeat ? 0 : Math.sin(Date.now() / 550) * 38);
       const perp       = { x: -dy / d, y: dx / d };
-      this.x += (dx / d * this.speed + perp.x * lateralAmt) * dt;
-      this.y += (dy / d * this.speed + perp.y * lateralAmt) * dt;
+      this.x += (dx / d * spd + perp.x * lateralAmt) * dt;
+      this.y += (dy / d * spd + perp.y * lateralAmt) * dt;
     } else {
       this.target = null;
       this.driftAngle += (Math.random() - 0.5) * 0.4;
@@ -352,6 +355,8 @@ export class TCell {
     this.scanTimer = 0;
     this.dissonanceTarget = null;
     this.escalationCooldown = 0;
+    this.isEvading = false;
+    this.burstCooldown = 0;
     // Lateral strafe state — flips sign periodically so the T-cell zigzags while fleeing
     this.strafeSign  = Math.random() < 0.5 ? 1 : -1;
     this.strafeTimer = 1.2 + Math.random() * 1.4;
@@ -386,6 +391,7 @@ export class TCell {
   update(dt, clones, player) {
     this.angle += dt * 0.4;
     this.escalationCooldown = Math.max(0, this.escalationCooldown - dt);
+    this.burstCooldown = Math.max(0, this.burstCooldown - dt);
     this.scanTimer -= dt;
     if (this.scanTimer <= 0) {
       const candidates = clones.filter(c => (c.roughness || 0) > 0.35);
@@ -402,6 +408,7 @@ export class TCell {
       const edy = this.y - player.y;
       const eDist = Math.hypot(edx, edy) || 1;
       if (eDist < EVADE_RADIUS) {
+        this.isEvading = true;
         // Strafe sign flips periodically — forces player to cut off angle rather than charge straight
         this.strafeTimer -= dt;
         if (this.strafeTimer <= 0) {
@@ -423,6 +430,7 @@ export class TCell {
         return;
       }
     }
+    this.isEvading = false;
 
     if (this.dissonanceTarget && clones.includes(this.dissonanceTarget)) {
       const dx = this.dissonanceTarget.x - this.x;
