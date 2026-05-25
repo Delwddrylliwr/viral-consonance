@@ -575,11 +575,11 @@ function loop(ts) {
       const pNote = player.getActiveNote(tc.x, tc.y);
       const tNote = tc.getActiveNote(player.x, player.y);
       if (roughness([pNote], [tNote], DEFAULT_TIMBRE) < TCELL_CAPTURE_THRESHOLD) {
+        resolutionCadence([pNote, tNote], player.chord);
         tcells = tcells.filter(t => t !== tc);
         immuneAlertLevel = Math.max(0, immuneAlertLevel - 0.3);
         tcellRespawnTimer = 25; // 25 s delay before a new T-cell appears
         mutatePlayerChord(tc.motif);
-        resolutionCadence();
         break;
       }
     }
@@ -709,10 +709,10 @@ function loop(ts) {
       const pNote = player.getActiveNote(bc.x, bc.y);
       const bNote = bc.getActiveNote(player.x, player.y);
       if (roughness([pNote], [bNote], DEFAULT_TIMBRE) < INFECTION_THRESHOLD) {
+        resolutionCadence([pNote, bNote], player.chord);
         bc.active = false;
         bc.flashTimer = 0.5;
         mutatePlayerChord(bc.motif);
-        resolutionCadence();
       }
     }
   }
