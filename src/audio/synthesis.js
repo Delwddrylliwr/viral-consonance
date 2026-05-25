@@ -100,9 +100,9 @@ export function resolutionCadence(contactNotes, playerChord) {
   }, 2000);
 }
 
-// Master volume tracks tempo: quiet at floor (60 BPM), full at ceiling (160 BPM)
+// Master volume tracks tempo: -18 dB at 60 BPM, reaches 0 dB at 160 BPM and stays there.
 export function setMasterVolume(bpm) {
-  const db = -18 + ((bpm - 60) / 100) * 18; // -18 dB → 0 dB
+  const db = Math.min(0, -18 + ((bpm - 60) / 100) * 18);
   Tone.getDestination().volume.rampTo(db, 0.5);
 }
 
@@ -168,6 +168,17 @@ export function dissonantStab(noteA, noteB) {
   }, 500);
 }
 
+// Alarming low growl when a macrophage latches onto the player
+export function playMacrophageAttach() {
+  const synth = new Tone.Synth({
+    oscillator: { type: 'sawtooth' },
+    envelope: { attack: 0.02, decay: 0.6, sustain: 0.4, release: 1.0 },
+  }).toDestination();
+  synth.volume.value = -8;
+  synth.triggerAttackRelease('Bb1', '4n');
+  setTimeout(() => synth.dispose(), 2500);
+}
+
 // Low thud when a macrophage consumes a clone
 export function playMacrophageConsume() {
   const synth = new Tone.MembraneSynth({
@@ -225,4 +236,47 @@ export function playNeutrophilExplode() {
   noise.volume.value = -12;
   noise.triggerAttackRelease('8n');
   setTimeout(() => noise.dispose(), 500);
+}
+
+// Arpeggiate the player's peak chord decelerating from peakBpm to rest, then a held bloom.
+// Restores master volume from death-sequence silence.
+export function scoreRevealSound(chord, peakBpm) {
+  Tone.getDestination().volume.rampTo(-10, 1.0);
+
+  const arpSynth = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: 'sine' },
+    envelope: { attack: 0.03, decay: 0.3, sustain: 0.0, release: 1.5 },
+  }).connect(getReverb());
+  arpSynth.volume.value = -12;
+
+  const bloomSynth = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: 'triangle' },
+    envelope: { attack: 0.25, decay: 1.5, sustain: 0.1, release: 3.0 },
+  }).connect(getReverb());
+  bloomSynth.volume.value = -16;
+
+  // Start at peak-BPM note interval, decelerate to 0.8 s/note via geometric interpolation.
+  // If peakBpm is at or below base tempo, all intervals stay equal (no deceleration needed).
+  const startInterval = 60 / Math.max(peakBpm, 60);
+  const endInterval   = Math.max(startInterval, 0.8);
+  const noteSeq = [...chord, ...chord, ...chord]; // 3 passes of the 3-note chord
+
+  const times = [0];
+  for (let i = 0; i < noteSeq.length - 1; i++) {
+    const progress = i / (noteSeq.length - 2); // 0 → 1 across 8 gaps
+    const interval = startInterval * Math.pow(endInterval / startInterval, progress);
+    times.push(times[times.length - 1] + interval);
+  }
+
+  const now = Tone.now() + 0.2;
+  noteSeq.forEach((hz, i) => {
+    arpSynth.triggerAttackRelease(hz, 0.08, now + times[i]);
+  });
+
+  // All chord notes together after the arpeggio settles
+  const bloomTime = now + times[times.length - 1] + endInterval;
+  bloomSynth.triggerAttackRelease(chord, 2.5, bloomTime);
+
+  const cleanupMs = (bloomTime - now + 8) * 1000;
+  setTimeout(() => { arpSynth.dispose(); bloomSynth.dispose(); }, cleanupMs);
 }

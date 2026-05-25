@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="88" fill="#0d0d14"/>
+
+  <!-- Stave — neon orange -->
+  <line x1="36" y1="40" x2="476" y2="40" stroke="#ff7722" stroke-width="36"/>
+  <line x1="36" y1="148" x2="476" y2="148" stroke="#ff7722" stroke-width="36"/>
+  <line x1="36" y1="256" x2="476" y2="256" stroke="#ff7722" stroke-width="36"/>
+  <line x1="36" y1="364" x2="476" y2="364" stroke="#ff7722" stroke-width="36"/>
+  <line x1="36" y1="472" x2="476" y2="472" stroke="#ff7722" stroke-width="36"/>
+
+  <!-- Semibreve: spans staveY[0]–staveY[2] vertically (ry=108), neon blue -->
+  <ellipse cx="175" cy="148" rx="100" ry="108" fill="#44aaff"/>
+  <ellipse cx="175" cy="148" rx="58" ry="70" transform="rotate(-20,175,148)" fill="#0d0d14"/>
+
+  <!-- Minim: hollow left-pointing triangle head on 2nd-lowest stave line -->
+  <polygon points="205.3,364 392.4,256.0 392.4,472.0" fill="none" stroke="white" stroke-width="44" stroke-linejoin="round"/>
+
+  <!-- Minim: stem from top-right corner to top stave line -->
+  <line x1="392.4" y1="256.0" x2="392.4" y2="40" stroke="white" stroke-width="38" stroke-linecap="round"/>
+</svg>

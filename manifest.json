@@ -1,0 +1,13 @@
+{
+  "name": "Viral Melody",
+  "short_name": "Viral",
+  "description": "A musical rhythm infection game",
+  "start_url": "/",
+  "display": "fullscreen",
+  "background_color": "#0d0d14",
+  "theme_color": "#44aaff",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

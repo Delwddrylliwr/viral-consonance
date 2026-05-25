@@ -15,7 +15,7 @@ const CELL_DEFS = [
 ];
 const CELL_DRIFT = 18; // px/s gentle background drift
 
-function angleDiff(a, b) {
+export function angleDiff(a, b) {
   return ((a - b) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI;
 }
 
@@ -268,11 +268,31 @@ export class Macrophage {
     this.maxConsumes     = 4; // dies after eating this many clones
     this.dead            = false;
     this.burstTimer      = 0;
+    this.rallyPoint      = null; // {x,y} — rush here before resuming normal behaviour
   }
 
   update(dt, clones, beatPhase, player, playerDissonance) {
     this.burstTimer = Math.max(0, this.burstTimer - dt);
     const spd = this.burstTimer > 0 ? this.speed * 1.8 : this.speed;
+    if (this.eatingPlayer && player) {
+      this.x = player.x;
+      this.y = player.y;
+      return;
+    }
+
+    // Summoned rally: beeline to the T-cell position before picking up normal targets
+    if (this.rallyPoint) {
+      const dx = this.rallyPoint.x - this.x, dy = this.rallyPoint.y - this.y;
+      const d  = Math.hypot(dx, dy) || 1;
+      if (d < 40) {
+        this.rallyPoint = null;
+      } else {
+        this.x += (dx / d) * this.speed * 1.6 * dt;
+        this.y += (dy / d) * this.speed * 1.6 * dt;
+        return;
+      }
+    }
+
     this.retargetTimer -= dt;
     if (this.retargetTimer <= 0) {
       // At high player dissonance, occasionally target the player instead of a clone
@@ -330,13 +350,16 @@ export class TCell {
   constructor(x, y) {
     this.x = x; this.y = y;
     this.radius = 22;
-    this.speed  = 75;
+    this.speed  = 82;
     this.angle  = 0; // slow rotation for square rendering
     this.scanTimer = 0;
     this.dissonanceTarget = null;
     this.escalationCooldown = 0;
     this.isEvading = false;
     this.burstCooldown = 0;
+    // Lateral strafe state — flips sign periodically so the T-cell zigzags while fleeing
+    this.strafeSign  = Math.random() < 0.5 ? 1 : -1;
+    this.strafeTimer = 1.2 + Math.random() * 1.4;
     // Motif: complement-shifted player notes — consonant only when player has all 3 proteins
     this.motif = [277.18, 311.13, 415.30, 554.37]; // C#4, Eb4, G#4, C#5
   }
@@ -379,15 +402,31 @@ export class TCell {
       this.scanTimer = 1.2;
     }
 
-    const EVADE_RADIUS = 160;
+    const EVADE_RADIUS = 210;
     if (player) {
       const edx = this.x - player.x;
       const edy = this.y - player.y;
       const eDist = Math.hypot(edx, edy) || 1;
       if (eDist < EVADE_RADIUS) {
         this.isEvading = true;
-        this.x += (edx / eDist) * this.speed * dt;
-        this.y += (edy / eDist) * this.speed * dt;
+        // Strafe sign flips periodically — forces player to cut off angle rather than charge straight
+        this.strafeTimer -= dt;
+        if (this.strafeTimer <= 0) {
+          this.strafeSign  = -this.strafeSign;
+          this.strafeTimer = 1.2 + Math.random() * 1.4;
+        }
+
+        // Speed burst when player gets very close — last-ditch escape
+        const closeFactor = eDist < 80 ? 1.35 : 1.0;
+        const evadeSpeed  = this.speed * 1.38 * closeFactor; // ~113–153 px/s vs player ~200 max
+
+        const nx = edx / eDist, ny = edy / eDist;
+        // Perpendicular direction; strafe weight fades toward zero as player approaches catch range
+        const strafeWeight = 0.55 * Math.min(1, eDist / EVADE_RADIUS);
+        const px = -ny * this.strafeSign, py = nx * this.strafeSign;
+
+        this.x += (nx + px * strafeWeight) * evadeSpeed * dt;
+        this.y += (ny + py * strafeWeight) * evadeSpeed * dt;
         return;
       }
     }
@@ -423,9 +462,9 @@ export class Antibody {
     this.attached      = false;
     this.attachAngle   = 0;
     this.vx = 0; this.vy = 0;
-    this.maxSpeed    = 200;  // px/s — faster pursuit
-    this.accel       = 380;  // px/s² toward player
-    this.maxTurnRate = Math.PI * 1.6; // rad/s — tighter tracking
+    this.maxSpeed    = 240;  // px/s — faster pursuit
+    this.accel       = 420;  // px/s² toward player
+    this.maxTurnRate = Math.PI * 2.0; // rad/s — tighter tracking
   }
 
   update(dt, player) {
@@ -509,6 +548,23 @@ export class Neutrophil {
   }
 }
 
+export class NeutrophilBlast {
+  constructor(x, y, maxRadius, speed) {
+    this.x = x;
+    this.y = y;
+    this.radius    = 0;
+    this.maxRadius = maxRadius;
+    this.speed     = speed;
+    this.dead      = false;
+    this.hitPlayer = false;
+  }
+
+  update(dt) {
+    this.radius = Math.min(this.maxRadius, this.radius + this.speed * dt);
+    if (this.radius >= this.maxRadius) this.dead = true;
+  }
+}
+
 export class BCell {
   constructor(x, y) {
     this.x = x; this.y = y;
@@ -560,7 +616,7 @@ export class BCell {
     if (this.flashTimer > 0) this.flashTimer = Math.max(0, this.flashTimer - dt);
 
     // Adaptive learning: reset familiarity when player chord changes (mutation occurred)
-    const chordKey = player.chord.join(',');
+    const chordKey = player.baseChord.join(',');
     if (this.knownChord !== chordKey) {
       if (this.knownChord !== null) this.familiarity = 0;
       this.knownChord = chordKey;
@@ -591,5 +647,13 @@ export class BCell {
 
     this.x += (moveX / mLen) * spd * dt;
     this.y += (moveY / mLen) * spd * dt;
+
+    // Clamp to screen edge so antibodies don't spawn beyond the 1500px cull distance
+    const maxDist = Math.hypot(screenHalfW, screenHalfH) + 80;
+    const curDist = Math.hypot(this.x - player.x, this.y - player.y) || 1;
+    if (curDist > maxDist) {
+      this.x = player.x + (this.x - player.x) * maxDist / curDist;
+      this.y = player.y + (this.y - player.y) * maxDist / curDist;
+    }
   }
 }
