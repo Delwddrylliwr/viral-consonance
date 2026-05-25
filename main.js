@@ -6,7 +6,8 @@ import { startTransport, onBeat, getBPM, setTempo } from './src/audio/transport.
 import { createPlayerVoice, createCellVoice, createCloneVoice, voiceCount,
          resolutionCadence, dissonantStab, playMutationSound,
          setMasterVolume, setChorusDepth, proteinAttachSound, proteinDetachSound, deathSequence,
-         playMacrophageConsume, playMacrophageAttach, playAntibodyAttach, playNeutrophilTick, playNeutrophilExplode }
+         playMacrophageConsume, playMacrophageAttach, playAntibodyAttach, playNeutrophilTick, playNeutrophilExplode,
+         scoreRevealSound }
   from './src/audio/synthesis.js';
 import { roughness, DEFAULT_TIMBRE } from './src/audio/consonance.js';
 import { PLAYER_CHORD } from './src/audio/scale.js';
@@ -94,6 +95,9 @@ let deathFade = 0;
 let gameTime = 0;   // seconds of live play
 let bpmAccum = 0;   // ∫ BPM dt — divide by gameTime for average
 let maxViralLoad = 0;
+let peakChord = null;
+let peakBpm   = BASE_BPM;
+let scoreRevealTriggered = false;
 
 let leaderboardChecked = false;
 let showingNameInput = false;
@@ -234,6 +238,8 @@ function init() {
   gameTime           = 0;
   bpmAccum           = 0;
   maxViralLoad       = 0;
+  peakChord          = null;
+  peakBpm            = BASE_BPM;
   state.dead         = false;
   letterBondFlash    = { playerDot: { x: 0, y: 0 }, cellDot: { x: 0, y: 0 }, timer: 0 };
 
@@ -358,6 +364,10 @@ function loop(ts) {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.restore();
     if (deathFade >= 0.95) {
+      if (!scoreRevealTriggered) {
+        scoreRevealTriggered = true;
+        scoreRevealSound(peakChord ?? [...PLAYER_CHORD], peakBpm);
+      }
       if (!leaderboardChecked) {
         leaderboardChecked = true;
         fetchLeaderboard().then(scores => {
@@ -422,7 +432,11 @@ function loop(ts) {
   // Accumulate BPM for final score
   gameTime += dt;
   bpmAccum += getBPM() * dt;
-  if (clones.length > maxViralLoad) maxViralLoad = clones.length;
+  if (clones.length > maxViralLoad) {
+    maxViralLoad = clones.length;
+    peakChord    = [...player.chord];
+    peakBpm      = getBPM();
+  }
 
   // Clone lifecycle — expired clones reduce viral load (and thus BPM)
   clones = clones.filter(c => c.alive);
