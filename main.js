@@ -102,12 +102,27 @@ let newEntryIdx = -1;
 
 // --- leaderboard ---
 
+const LEADERBOARD_KEY  = 'viral_consonance_scores';
 const LEADERBOARD_SIZE = 10;
 
-async function fetchLeaderboard() {
-  const res = await fetch('/api/scores'); // let network errors throw
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+function getLeaderboard() {
+  try { return JSON.parse(localStorage.getItem(LEADERBOARD_KEY) || '[]'); } catch { return []; }
+}
+
+function isTopScore(score) {
+  if (score === 0) return false;
+  const scores = getLeaderboard();
+  return scores.length < LEADERBOARD_SIZE || score > scores[scores.length - 1].score;
+}
+
+function saveScore(name, score) {
+  const scores = getLeaderboard();
+  const entry  = { name: (name.trim() || 'unknown').substring(0, 14), score };
+  scores.push(entry);
+  scores.sort((a, b) => b.score - a.score);
+  scores.splice(LEADERBOARD_SIZE);
+  localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(scores));
+  return { scores, idx: scores.indexOf(entry) };
 }
 
 function showNameInputOverlay() {
@@ -119,21 +134,10 @@ function showNameInputOverlay() {
   input.value = '';
   setTimeout(() => input.focus(), 50);
 
-  async function submit() {
-    btn.disabled    = true;
-    btn.textContent = 'saving…';
-    try {
-      const res  = await fetch('/api/scores', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ name: input.value, score: maxViralLoad }),
-      });
-      const data = await res.json();
-      finalLeaderboard = data.scores;
-      newEntryIdx      = data.idx;
-    } catch {
-      finalLeaderboard = [];
-    }
+  function submit() {
+    const { scores, idx } = saveScore(input.value, maxViralLoad);
+    finalLeaderboard = scores;
+    newEntryIdx      = idx;
     overlay.style.display = 'none';
     showingNameInput = false;
   }
@@ -360,18 +364,11 @@ function loop(ts) {
     if (deathFade >= 0.95) {
       if (!leaderboardChecked) {
         leaderboardChecked = true;
-        fetchLeaderboard().then(scores => {
-          const qualifies = maxViralLoad > 0
-            && (scores.length < LEADERBOARD_SIZE
-                || maxViralLoad > (scores[scores.length - 1]?.score ?? -1));
-          if (qualifies) {
-            showNameInputOverlay();
-          } else {
-            finalLeaderboard = scores;
-          }
-        }).catch(() => {
-          finalLeaderboard = []; // server unreachable — skip prompt, unblock restart
-        });
+        if (isTopScore(maxViralLoad)) {
+          showNameInputOverlay();
+        } else {
+          finalLeaderboard = getLeaderboard();
+        }
       }
       const avgBpm = Math.round(gameTime > 0 ? bpmAccum / gameTime : BASE_BPM);
       const cx = canvas.width / 2;
