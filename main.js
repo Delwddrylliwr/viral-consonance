@@ -430,6 +430,10 @@ function loop(ts) {
   tcells = tcells.filter(tc => Math.hypot(tc.x - player.x, tc.y - player.y) < 1500);
   for (const tc of tcells) {
     tc.update(dt, clones, player);
+    if (tc.isEvading && tc.burstCooldown <= 0) {
+      for (const m of macrophages) m.burstTimer = 2.5;
+      tc.burstCooldown = 5;
+    }
     for (const c of clones) {
       if ((c.roughness || 0) > 0.35
           && Math.hypot(tc.x - c.x, tc.y - c.y) < tc.radius + c.radius + 15

@@ -267,9 +267,12 @@ export class Macrophage {
     this.consumeCount    = 0;
     this.maxConsumes     = 4; // dies after eating this many clones
     this.dead            = false;
+    this.burstTimer      = 0;
   }
 
   update(dt, clones, beatPhase, player, playerDissonance) {
+    this.burstTimer = Math.max(0, this.burstTimer - dt);
+    const spd = this.burstTimer > 0 ? this.speed * 1.8 : this.speed;
     this.retargetTimer -= dt;
     if (this.retargetTimer <= 0) {
       // At high player dissonance, occasionally target the player instead of a clone
@@ -290,20 +293,20 @@ export class Macrophage {
       const dx = player.x - this.x, dy = player.y - this.y;
       const d  = Math.hypot(dx, dy) || 1;
       const onBeat     = beatPhase < 0.2;
-      const lateralAmt = onBeat ? 0 : Math.sin(Date.now() / 550) * 38;
+      const lateralAmt = this.burstTimer > 0 ? 0 : (onBeat ? 0 : Math.sin(Date.now() / 550) * 38);
       const perp       = { x: -dy / d, y: dx / d };
-      this.x += (dx / d * this.speed + perp.x * lateralAmt) * dt;
-      this.y += (dy / d * this.speed + perp.y * lateralAmt) * dt;
+      this.x += (dx / d * spd + perp.x * lateralAmt) * dt;
+      this.y += (dy / d * spd + perp.y * lateralAmt) * dt;
     } else if (this.target && clones.includes(this.target)) {
       const dx = this.target.x - this.x;
       const dy = this.target.y - this.y;
       const d  = Math.hypot(dx, dy) || 1;
       // On beat (beatPhase < 0.2): seek directly. Off-beat: orbit laterally.
       const onBeat     = beatPhase < 0.2;
-      const lateralAmt = onBeat ? 0 : Math.sin(Date.now() / 550) * 38;
+      const lateralAmt = this.burstTimer > 0 ? 0 : (onBeat ? 0 : Math.sin(Date.now() / 550) * 38);
       const perp       = { x: -dy / d, y: dx / d };
-      this.x += (dx / d * this.speed + perp.x * lateralAmt) * dt;
-      this.y += (dy / d * this.speed + perp.y * lateralAmt) * dt;
+      this.x += (dx / d * spd + perp.x * lateralAmt) * dt;
+      this.y += (dy / d * spd + perp.y * lateralAmt) * dt;
     } else {
       this.target = null;
       this.driftAngle += (Math.random() - 0.5) * 0.4;
@@ -332,6 +335,8 @@ export class TCell {
     this.scanTimer = 0;
     this.dissonanceTarget = null;
     this.escalationCooldown = 0;
+    this.isEvading = false;
+    this.burstCooldown = 0;
     // Motif: complement-shifted player notes — consonant only when player has all 3 proteins
     this.motif = [277.18, 311.13, 415.30, 554.37]; // C#4, Eb4, G#4, C#5
   }
@@ -363,6 +368,7 @@ export class TCell {
   update(dt, clones, player) {
     this.angle += dt * 0.4;
     this.escalationCooldown = Math.max(0, this.escalationCooldown - dt);
+    this.burstCooldown = Math.max(0, this.burstCooldown - dt);
     this.scanTimer -= dt;
     if (this.scanTimer <= 0) {
       const candidates = clones.filter(c => (c.roughness || 0) > 0.35);
@@ -379,11 +385,13 @@ export class TCell {
       const edy = this.y - player.y;
       const eDist = Math.hypot(edx, edy) || 1;
       if (eDist < EVADE_RADIUS) {
+        this.isEvading = true;
         this.x += (edx / eDist) * this.speed * dt;
         this.y += (edy / eDist) * this.speed * dt;
         return;
       }
     }
+    this.isEvading = false;
 
     if (this.dissonanceTarget && clones.includes(this.dissonanceTarget)) {
       const dx = this.dissonanceTarget.x - this.x;
