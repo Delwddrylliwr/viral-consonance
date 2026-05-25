@@ -248,6 +248,8 @@ function init() {
   cloneVoice  = createCloneVoice();
 
   onBeat(() => {
+    if (dead) return;
+
     updateCommittedCell();
 
     state.tempo          = getBPM();
@@ -320,6 +322,7 @@ function init() {
 function triggerDeath() {
   dead = true;
   state.dead = true;
+  playerVoice.stop();
   deathSequence(() => { deathFade = 1; });
 }
 
