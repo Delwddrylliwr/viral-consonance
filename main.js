@@ -88,6 +88,11 @@ let macrophages, tcells, antibodies, neutrophils, bcells, blasts;
 let antibodySpawnTimer  = 15;
 let tcellRespawnTimer   = 0;
 let immuneAlertLevel = 0;
+let tcellAdaptation  = 0; // 0→1, grows ∝ BPM, resets on chord mutation
+let bcellAdaptation  = 0; // same, but controls neutrophil rate (slower base ramp)
+let tcellAdaptKnownChord = null;
+let bcellAdaptKnownChord = null;
+let nphilSpawnTimer  = 0;
 let infectionFlash = 0;
 let letterBondFlash = { playerDot: { x: 0, y: 0 }, cellDot: { x: 0, y: 0 }, timer: 0 };
 let dead = false;
@@ -230,9 +235,14 @@ function init() {
   neutrophils        = [];
   bcells             = [];
   blasts             = [];
-  antibodySpawnTimer = 15;
-  tcellRespawnTimer  = 0;
-  immuneAlertLevel   = 0;
+  antibodySpawnTimer   = 15;
+  tcellRespawnTimer    = 0;
+  immuneAlertLevel     = 0;
+  tcellAdaptation      = 0;
+  bcellAdaptation      = 0;
+  tcellAdaptKnownChord = null;
+  bcellAdaptKnownChord = null;
+  nphilSpawnTimer      = 15; // 15s grace period before first neutrophil
   dead               = false;
   deathFade          = 0;
   gameTime           = 0;
@@ -260,6 +270,8 @@ function init() {
     state.tcellCount       = tcells.length;
     state.immuneAlert      = immuneAlertLevel;
     state.bcellFamiliarity = bcells.reduce((m, b) => Math.max(m, b.familiarity), 0);
+    state.tcellAdaptation  = tcellAdaptation;
+    state.bcellAdaptation  = bcellAdaptation;
 
     // Neutrophil fuse countdown — fires on each beat while attached to a clone or player
     for (const n of neutrophils.filter(n => (n.attached || n.attachedToPlayer) && !n.dead)) {
@@ -441,8 +453,6 @@ function loop(ts) {
     peakBpm      = getBPM();
   }
 
-  // Clone lifecycle — expired clones reduce viral load (and thus BPM)
-  clones = clones.filter(c => c.alive);
   for (const c of clones) c.update(dt);
   setTempo(BASE_BPM + clones.length * BPM_PER_CLONE);
 
@@ -544,6 +554,17 @@ function loop(ts) {
   const playerDissonance = roughness(player.chord, PLAYER_CHORD, DEFAULT_TIMBRE);
   const attachedProteinCount = proteins.filter(p => p.attached).length;
 
+  // T-cell and B-cell adaptation: grow proportional to BPM, reset when player chord mutates
+  {
+    const chordKey = player.baseChord.join(',');
+    if (tcellAdaptKnownChord !== null && tcellAdaptKnownChord !== chordKey) tcellAdaptation = 0;
+    tcellAdaptKnownChord = chordKey;
+    tcellAdaptation = Math.min(1, tcellAdaptation + dt * (getBPM() / BASE_BPM) / 60);
+    if (bcellAdaptKnownChord !== null && bcellAdaptKnownChord !== chordKey) bcellAdaptation = 0;
+    bcellAdaptKnownChord = chordKey;
+    bcellAdaptation = Math.min(1, bcellAdaptation + dt * (getBPM() / BASE_BPM) / 120);
+  }
+
   // T-cell: respawns after a delay (longer if last one was neutralised by player)
   tcellRespawnTimer = Math.max(0, tcellRespawnTimer - dt);
   if (tcells.length < 1 && tcellRespawnTimer <= 0) tcells.push(new TCell(...randomEdgePos()));
@@ -595,9 +616,7 @@ function loop(ts) {
   if (macrophages.length > MACROPHAGE_MAX) macrophages.length = MACROPHAGE_MAX;
 
   for (const m of macrophages) {
-    // Only allow player-targeting at high alert
-    const macroPlayerDissonance = immuneAlertLevel >= ALERT_THRESHOLD_MACRO_PLAYER ? playerDissonance : 0;
-    m.update(dt, clones, beatPhase, player, macroPlayerDissonance);
+    m.update(dt, clones, beatPhase, player, playerDissonance, tcellAdaptation);
 
     // Macrophage eats player: contact starts a 2s eat window; shake to escape
     if (m.targetingPlayer && !m.eatingPlayer
@@ -630,36 +649,39 @@ function loop(ts) {
     }
   }
 
-  // Neutrophil: gated at ALERT_THRESHOLD_NEUTROPHIL; at high alert also targets player
+  // Neutrophils: spawn rate and max count scale with B-cell adaptation (not alert level)
   neutrophils = neutrophils.filter(n => !n.dead);
-  if (neutrophils.length < 1 && clones.length > 0 && immuneAlertLevel >= ALERT_THRESHOLD_NEUTROPHIL) {
+  nphilSpawnTimer = Math.max(0, nphilSpawnTimer - dt);
+  const nphilMaxCount      = Math.floor(bcellAdaptation * 4) + 1;         // 1 → 5
+  const nphilSpawnInterval = Math.max(3, 20 - bcellAdaptation * 17);      // 20s → 3s
+  if (neutrophils.length < nphilMaxCount && clones.length > 0 && nphilSpawnTimer <= 0) {
     neutrophils.push(new Neutrophil(...randomEdgePos()));
+    nphilSpawnTimer = nphilSpawnInterval;
   }
   for (const n of neutrophils) {
-    // At high alert: switch to targeting player
-    if (immuneAlertLevel >= ALERT_THRESHOLD_NPHIL_PLAYER && !n.attached && clones.length === 0) {
-      n.targetingPlayer = true;
-      n.playerTarget = player;
-    } else {
-      n.targetingPlayer = false;
-      n.playerTarget    = null;
+    // Targeting: player is a target if dissonant and close (lure tactic), or as fallback at extreme alert
+    if (!n.attachedToPlayer && !n.attached) {
+      const distToPlayer = Math.hypot(n.x - player.x, n.y - player.y);
+      const shouldTargetPlayer =
+        (playerDissonance > 0.25 && distToPlayer < 150) ||
+        (immuneAlertLevel >= ALERT_THRESHOLD_NPHIL_PLAYER && clones.length === 0);
+      n.targetingPlayer = shouldTargetPlayer;
+      n.playerTarget    = shouldTargetPlayer ? player : null;
     }
     n.update(dt, clones);
     if (!n.attached && !n.targetingPlayer && n.target && clones.includes(n.target)
         && Math.hypot(n.x - n.target.x, n.y - n.target.y) < n.radius + n.target.radius) {
       n.attached = true;
     }
-    // Neutrophil attacks player: contact starts a fuse; shake to escape
+    // Latch to player on contact; shake off like a complement protein
     if (n.targetingPlayer && !n.attachedToPlayer
         && Math.hypot(n.x - player.x, n.y - player.y) < n.radius + player.radius) {
       n.attachedToPlayer = true;
       n.playerFuseBeats  = 0;
     }
-    if (n.attachedToPlayer) {
-      if (playerShook) {
-        n.attachedToPlayer = false;
-        n.targetingPlayer  = false;
-      }
+    if (n.attachedToPlayer && playerShook) {
+      n.attachedToPlayer = false;
+      n.targetingPlayer  = false;
     }
   }
 
