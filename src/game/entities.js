@@ -205,15 +205,12 @@ export class ComplementProtein {
   }
 }
 
-const CLONE_LIFETIME_S = 20;
-
 export class Clone {
   constructor(x, y, chord) {
     this.x = x; this.y = y;
     this.radius = 18;
     this.chord = chord.slice();
     this.detuning = (Math.random() - 0.5) * 0.005786; // ±5 cents
-    this.lifetime = CLONE_LIFETIME_S;
     this.angle = Math.random() * Math.PI * 2;
     const speed = 30 + Math.random() * 20;
     const dir = Math.random() * Math.PI * 2;
@@ -223,13 +220,10 @@ export class Clone {
     this.roughness = 0; // pre-computed each frame in main.js
   }
 
-  get alive() { return this.lifetime > 0; }
-
-  // Fades out in the last 5 s of life
-  get alpha() { return Math.min(1, this.lifetime / 5); }
+  get alive() { return true; }
+  get alpha()  { return 1; }
 
   update(dt) {
-    this.lifetime -= dt;
     this.angle += 0.4 * dt;
     this.x += this.vx * dt;
     this.y += this.vy * dt;
@@ -271,7 +265,7 @@ export class Macrophage {
     this.rallyPoint      = null; // {x,y} — rush here before resuming normal behaviour
   }
 
-  update(dt, clones, beatPhase, player, playerDissonance) {
+  update(dt, clones, beatPhase, player, playerDissonance, tcellAdaptation) {
     this.burstTimer = Math.max(0, this.burstTimer - dt);
     const spd = this.burstTimer > 0 ? this.speed * 1.8 : this.speed;
     if (this.eatingPlayer && player) {
@@ -295,18 +289,23 @@ export class Macrophage {
 
     this.retargetTimer -= dt;
     if (this.retargetTimer <= 0) {
-      // At high player dissonance, occasionally target the player instead of a clone
-      if (player && (playerDissonance || 0) >= 0.5 && Math.random() < 0.4) {
+      const dissonance = playerDissonance || 0;
+      const adaptation = tcellAdaptation || 0;
+      // Probability of targeting player scales directly with player dissonance (complement + antibodies)
+      if (player && Math.random() < dissonance) {
         this.targetingPlayer = true;
         this.target = null;
       } else {
         this.targetingPlayer = false;
-        // Prefer most-dissonant clone (rougher chord = more "foreign")
+        // Random clone selection — any clone is a valid target regardless of consonance
         this.target = clones.length > 0
-          ? clones.reduce((b, c) => !b || (c.roughness || 0) > (b.roughness || 0) ? c : b, null)
+          ? clones[Math.floor(Math.random() * clones.length)]
           : null;
       }
-      this.retargetTimer = 1.6 + Math.random() * 0.4;
+      // Retarget interval: shrinks as T-cells adapt (3s → 0.5s); player dissonance speeds it up further
+      const baseInterval   = 3.0 - adaptation * 2.5;
+      const dissonanceBoost = 1 - dissonance * 0.7;
+      this.retargetTimer = Math.max(0.3, baseInterval * dissonanceBoost + (Math.random() - 0.5) * 0.4);
     }
 
     if (this.targetingPlayer && player) {
@@ -518,6 +517,11 @@ export class Neutrophil {
     if (this.jitterTimer <= 0) {
       this.jitterAngle += (Math.random() - 0.5) * 2.8;
       this.jitterTimer = 0.08 + Math.random() * 0.12;
+    }
+    if (this.attachedToPlayer && this.playerTarget) {
+      this.x = this.playerTarget.x;
+      this.y = this.playerTarget.y;
+      return;
     }
     if (this.attached && this.target && clones.includes(this.target)) {
       this.x = this.target.x;

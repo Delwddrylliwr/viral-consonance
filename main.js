@@ -88,6 +88,11 @@ let macrophages, tcells, antibodies, neutrophils, bcells, blasts;
 let antibodySpawnTimer  = 15;
 let tcellRespawnTimer   = 0;
 let immuneAlertLevel = 0;
+let tcellAdaptation  = 0; // 0→1, grows ∝ BPM, resets on chord mutation
+let bcellAdaptation  = 0; // same, but controls neutrophil rate (slower base ramp)
+let tcellAdaptKnownChord = null;
+let bcellAdaptKnownChord = null;
+let nphilSpawnTimer  = 0;
 let infectionFlash = 0;
 let letterBondFlash = { playerDot: { x: 0, y: 0 }, cellDot: { x: 0, y: 0 }, timer: 0 };
 let dead = false;
@@ -98,6 +103,11 @@ let maxViralLoad = 0;
 let peakChord = null;
 let peakBpm   = BASE_BPM;
 let scoreRevealTriggered = false;
+let mutationHintTimer = 0;
+let celebrationChord  = null;
+let celebrationBpm    = null;
+let eraMaxClones      = 0;
+let eraPeakBpm        = BASE_BPM;
 
 let leaderboardChecked = false;
 let showingNameInput = false;
@@ -112,6 +122,10 @@ async function fetchLeaderboard() {
   const res = await fetch('/api/scores'); // let network errors throw
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
+}
+
+function calcScore() {
+  return Math.round((bpmAccum - BASE_BPM * gameTime) / BPM_PER_CLONE);
 }
 
 function showNameInputOverlay() {
@@ -130,7 +144,7 @@ function showNameInputOverlay() {
       const res  = await fetch('/api/scores', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ name: input.value, score: maxViralLoad }),
+        body:    JSON.stringify({ name: input.value, score: calcScore() }),
       });
       const data = await res.json();
       finalLeaderboard = data.scores;
@@ -157,6 +171,13 @@ function mutatePlayerChord(sourceMotif) {
   };
   const candidates = sourceMotif.filter(n => !player.chord.some(p => sameChroma(p, n)));
   if (candidates.length > 0) {
+    if (eraMaxClones > STARTER_CLONES) {
+      celebrationChord = [...player.baseChord];
+      celebrationBpm   = eraPeakBpm;
+    }
+    eraMaxClones      = 0;
+    eraPeakBpm        = BASE_BPM;
+    mutationHintTimer = 3.5;
     const inherited  = candidates[Math.floor(Math.random() * candidates.length)];
     const replaceIdx = Math.floor(Math.random() * 3);
     player.chord[replaceIdx]     = inherited;
@@ -230,17 +251,28 @@ function init() {
   neutrophils        = [];
   bcells             = [];
   blasts             = [];
-  antibodySpawnTimer = 15;
-  tcellRespawnTimer  = 0;
-  immuneAlertLevel   = 0;
+  antibodySpawnTimer   = 15;
+  tcellRespawnTimer    = 0;
+  immuneAlertLevel     = 0;
+  tcellAdaptation      = 0;
+  bcellAdaptation      = 0;
+  tcellAdaptKnownChord = null;
+  bcellAdaptKnownChord = null;
+  nphilSpawnTimer      = 15; // 15s grace period before first neutrophil
   dead               = false;
   deathFade          = 0;
   gameTime           = 0;
   bpmAccum           = 0;
-  maxViralLoad       = 0;
-  peakChord          = null;
-  peakBpm            = BASE_BPM;
-  state.dead         = false;
+  maxViralLoad      = 0;
+  peakChord         = null;
+  peakBpm           = BASE_BPM;
+  scoreRevealTriggered = false;
+  mutationHintTimer = 0;
+  celebrationChord  = null;
+  celebrationBpm    = null;
+  eraMaxClones      = 0;
+  eraPeakBpm        = BASE_BPM;
+  state.dead        = false;
   letterBondFlash    = { playerDot: { x: 0, y: 0 }, cellDot: { x: 0, y: 0 }, timer: 0 };
 
   playerVoice = createPlayerVoice();
@@ -260,6 +292,8 @@ function init() {
     state.tcellCount       = tcells.length;
     state.immuneAlert      = immuneAlertLevel;
     state.bcellFamiliarity = bcells.reduce((m, b) => Math.max(m, b.familiarity), 0);
+    state.tcellAdaptation  = tcellAdaptation;
+    state.bcellAdaptation  = bcellAdaptation;
 
     // Neutrophil fuse countdown — fires on each beat while attached to a clone or player
     for (const n of neutrophils.filter(n => (n.attached || n.attachedToPlayer) && !n.dead)) {
@@ -320,6 +354,10 @@ function init() {
 }
 
 function triggerDeath() {
+  if (eraMaxClones > STARTER_CLONES) {
+    celebrationChord = [...player.baseChord];
+    celebrationBpm   = eraPeakBpm;
+  }
   dead = true;
   state.dead = true;
   playerVoice.stop();
@@ -369,14 +407,18 @@ function loop(ts) {
     if (deathFade >= 0.95) {
       if (!scoreRevealTriggered) {
         scoreRevealTriggered = true;
-        scoreRevealSound(peakChord ?? [...PLAYER_CHORD], peakBpm);
+        scoreRevealSound(
+          celebrationChord ?? peakChord ?? [...PLAYER_CHORD],
+          celebrationBpm   ?? peakBpm
+        );
       }
       if (!leaderboardChecked) {
         leaderboardChecked = true;
         fetchLeaderboard().then(scores => {
-          const qualifies = maxViralLoad > 0
+          const score = calcScore();
+          const qualifies = score > 0
             && (scores.length < LEADERBOARD_SIZE
-                || maxViralLoad > (scores[scores.length - 1]?.score ?? -1));
+                || score > (scores[scores.length - 1]?.score ?? -1));
           if (qualifies) {
             showNameInputOverlay();
           } else {
@@ -396,14 +438,14 @@ function loop(ts) {
       ctx.fillText('your infection has been contained', cx, cy - 54);
       ctx.font = '26px monospace';
       ctx.fillStyle = '#888';
-      ctx.fillText(`max viral load  ${maxViralLoad}`, cx, cy - 28);
+      ctx.fillText(`viral spread  ${calcScore()}`, cx, cy - 28);
       ctx.font = '20px monospace';
-      ctx.fillText(`(avg ${avgBpm} BPM)`, cx, cy - 2);
+      ctx.fillText(`(peak ${maxViralLoad} clones · avg ${avgBpm} BPM)`, cx, cy - 2);
 
       if (finalLeaderboard !== null && finalLeaderboard.length > 0) {
         ctx.font = '12px monospace';
         ctx.fillStyle = '#555';
-        ctx.fillText('top viral loads', cx, cy + 22);
+        ctx.fillText('top viral spreads', cx, cy + 22);
         for (let i = 0; i < finalLeaderboard.length; i++) {
           const e   = finalLeaderboard[i];
           const ey  = cy + 37 + i * 15;
@@ -440,9 +482,9 @@ function loop(ts) {
     peakChord    = [...player.chord];
     peakBpm      = getBPM();
   }
+  if (clones.length > eraMaxClones) eraMaxClones = clones.length;
+  if (getBPM()       > eraPeakBpm)  eraPeakBpm   = getBPM();
 
-  // Clone lifecycle — expired clones reduce viral load (and thus BPM)
-  clones = clones.filter(c => c.alive);
   for (const c of clones) c.update(dt);
   setTempo(BASE_BPM + clones.length * BPM_PER_CLONE);
 
@@ -544,6 +586,17 @@ function loop(ts) {
   const playerDissonance = roughness(player.chord, PLAYER_CHORD, DEFAULT_TIMBRE);
   const attachedProteinCount = proteins.filter(p => p.attached).length;
 
+  // T-cell and B-cell adaptation: grow proportional to BPM, reset when player chord mutates
+  {
+    const chordKey = player.baseChord.join(',');
+    if (tcellAdaptKnownChord !== null && tcellAdaptKnownChord !== chordKey) tcellAdaptation = 0;
+    tcellAdaptKnownChord = chordKey;
+    tcellAdaptation = Math.min(1, tcellAdaptation + dt * (getBPM() / BASE_BPM) / 60);
+    if (bcellAdaptKnownChord !== null && bcellAdaptKnownChord !== chordKey) bcellAdaptation = 0;
+    bcellAdaptKnownChord = chordKey;
+    bcellAdaptation = Math.min(1, bcellAdaptation + dt * (getBPM() / BASE_BPM) / 120);
+  }
+
   // T-cell: respawns after a delay (longer if last one was neutralised by player)
   tcellRespawnTimer = Math.max(0, tcellRespawnTimer - dt);
   if (tcells.length < 1 && tcellRespawnTimer <= 0) tcells.push(new TCell(...randomEdgePos()));
@@ -595,9 +648,7 @@ function loop(ts) {
   if (macrophages.length > MACROPHAGE_MAX) macrophages.length = MACROPHAGE_MAX;
 
   for (const m of macrophages) {
-    // Only allow player-targeting at high alert
-    const macroPlayerDissonance = immuneAlertLevel >= ALERT_THRESHOLD_MACRO_PLAYER ? playerDissonance : 0;
-    m.update(dt, clones, beatPhase, player, macroPlayerDissonance);
+    m.update(dt, clones, beatPhase, player, playerDissonance, tcellAdaptation);
 
     // Macrophage eats player: contact starts a 2s eat window; shake to escape
     if (m.targetingPlayer && !m.eatingPlayer
@@ -630,36 +681,39 @@ function loop(ts) {
     }
   }
 
-  // Neutrophil: gated at ALERT_THRESHOLD_NEUTROPHIL; at high alert also targets player
+  // Neutrophils: spawn rate and max count scale with B-cell adaptation (not alert level)
   neutrophils = neutrophils.filter(n => !n.dead);
-  if (neutrophils.length < 1 && clones.length > 0 && immuneAlertLevel >= ALERT_THRESHOLD_NEUTROPHIL) {
+  nphilSpawnTimer = Math.max(0, nphilSpawnTimer - dt);
+  const nphilMaxCount      = Math.floor(bcellAdaptation * 4) + 1;         // 1 → 5
+  const nphilSpawnInterval = Math.max(3, 20 - bcellAdaptation * 17);      // 20s → 3s
+  if (neutrophils.length < nphilMaxCount && clones.length > 0 && nphilSpawnTimer <= 0) {
     neutrophils.push(new Neutrophil(...randomEdgePos()));
+    nphilSpawnTimer = nphilSpawnInterval;
   }
   for (const n of neutrophils) {
-    // At high alert: switch to targeting player
-    if (immuneAlertLevel >= ALERT_THRESHOLD_NPHIL_PLAYER && !n.attached && clones.length === 0) {
-      n.targetingPlayer = true;
-      n.playerTarget = player;
-    } else {
-      n.targetingPlayer = false;
-      n.playerTarget    = null;
+    // Targeting: player is a target if dissonant and close (lure tactic), or as fallback at extreme alert
+    if (!n.attachedToPlayer && !n.attached) {
+      const distToPlayer = Math.hypot(n.x - player.x, n.y - player.y);
+      const shouldTargetPlayer =
+        (playerDissonance > 0.25 && distToPlayer < 150) ||
+        (immuneAlertLevel >= ALERT_THRESHOLD_NPHIL_PLAYER && clones.length === 0);
+      n.targetingPlayer = shouldTargetPlayer;
+      n.playerTarget    = shouldTargetPlayer ? player : null;
     }
     n.update(dt, clones);
     if (!n.attached && !n.targetingPlayer && n.target && clones.includes(n.target)
         && Math.hypot(n.x - n.target.x, n.y - n.target.y) < n.radius + n.target.radius) {
       n.attached = true;
     }
-    // Neutrophil attacks player: contact starts a fuse; shake to escape
+    // Latch to player on contact; shake off like a complement protein
     if (n.targetingPlayer && !n.attachedToPlayer
         && Math.hypot(n.x - player.x, n.y - player.y) < n.radius + player.radius) {
       n.attachedToPlayer = true;
       n.playerFuseBeats  = 0;
     }
-    if (n.attachedToPlayer) {
-      if (playerShook) {
-        n.attachedToPlayer = false;
-        n.targetingPlayer  = false;
-      }
+    if (n.attachedToPlayer && playerShook) {
+      n.attachedToPlayer = false;
+      n.targetingPlayer  = false;
     }
   }
 
@@ -799,6 +853,17 @@ function loop(ts) {
   const blastDanger  = blasts.some(b => !b.dead && Math.hypot(b.x - player.x, b.y - player.y) <= b.maxRadius) ? 1 : 0;
   const dangerIntensity = Math.max(bpmDanger, latchDanger, blastDanger);
   drawDangerBorder(ctx, dangerIntensity, now);
+
+  if (mutationHintTimer > 0) {
+    mutationHintTimer = Math.max(0, mutationHintTimer - dt);
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, mutationHintTimer);
+    ctx.fillStyle = '#8af';
+    ctx.font = '13px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('chord mutated — viral spread still accumulating', canvas.width / 2, 28);
+    ctx.restore();
+  }
 
   requestAnimationFrame(loop);
 }
