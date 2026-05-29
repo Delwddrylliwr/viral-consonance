@@ -508,8 +508,10 @@ function loop(ts) {
     }
   }
 
-  // Shake detection — computed once, used for both proteins and antibodies
-  const playerShook = player.detectShake(now);
+  // Shake detection — three tiers: complement (easy) < phage/nphil (medium) < antibody (hard)
+  const playerShook  = player.detectShake(now);
+  const mediumShake  = playerShook && Math.hypot(player.vx, player.vy) > 100;
+  const hardShake    = playerShook && Math.hypot(player.vx, player.vy) > 160;
 
   // Protein shake-off (only play sound when something actually detaches)
   if (playerShook) {
@@ -662,7 +664,7 @@ function loop(ts) {
     }
     if (m.eatingPlayer) {
       m.eatTimer -= dt;
-      if (playerShook) {
+      if (mediumShake) {
         m.eatingPlayer = false;
         m.targetingPlayer = false;
       } else if (m.eatTimer <= 0 && !dead) {
@@ -714,7 +716,7 @@ function loop(ts) {
       n.attachedToPlayer = true;
       n.playerFuseBeats  = 0;
     }
-    if (n.attachedToPlayer && playerShook) {
+    if (n.attachedToPlayer && mediumShake) {
       n.attachedToPlayer = false;
       n.targetingPlayer  = false;
     }
@@ -775,8 +777,6 @@ function loop(ts) {
   }
 
 
-  // Harder antibody shake-off: requires a more forceful direction reversal
-  const hardShake = playerShook && Math.hypot(player.vx, player.vy) > 160;
   for (let i = antibodies.length - 1; i >= 0; i--) {
     const ab = antibodies[i];
     ab.update(dt, player);
