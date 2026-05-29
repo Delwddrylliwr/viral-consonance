@@ -585,11 +585,13 @@ function loop(ts) {
   immuneAlertLevel = Math.max(0, immuneAlertLevel - 0.08 * dt);
 
   // playerDissonance: drift from original tonic chord — used for blast lethality
-  // attachmentDissonance: drift from player's own baseChord — used for phage/nphil targeting
-  // (attachmentDissonance is 0 when no proteins/antibodies are attached, regardless of mutation)
-  const playerDissonance     = roughness(player.chord, PLAYER_CHORD,        DEFAULT_TIMBRE);
-  const attachmentDissonance = roughness(player.chord, player.baseChord,    DEFAULT_TIMBRE);
-  const attachedProteinCount = proteins.filter(p => p.attached).length;
+  const playerDissonance  = roughness(player.chord, PLAYER_CHORD, DEFAULT_TIMBRE);
+  // attachmentDissonance: 0→1 based on proteins/antibodies currently latched to player.
+  // Using roughness(chord, baseChord) gives non-zero even with no attachments (self-interaction
+  // of chord notes), so we count attachments explicitly instead.
+  const attachedProteinCount  = proteins.filter(p => p.attached).length;
+  const attachedAntibodyCount = antibodies.filter(ab => ab.attached).length;
+  const attachmentDissonance  = (attachedProteinCount + attachedAntibodyCount) / 3;
 
   // T-cell and B-cell adaptation: grow proportional to BPM, reset when player chord mutates
   {
