@@ -25,8 +25,8 @@ const KEY_MAP = {
   ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down',
   ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right',
 };
-window.addEventListener('keydown', e => { if (KEY_MAP[e.code]) { input[KEY_MAP[e.code]] = true;  e.preventDefault(); } });
-window.addEventListener('keyup',   e => { if (KEY_MAP[e.code]) { input[KEY_MAP[e.code]] = false; } });
+window.addEventListener('keydown', e => { if (KEY_MAP[e.code] && !showingNameInput) { input[KEY_MAP[e.code]] = true;  e.preventDefault(); } });
+window.addEventListener('keyup',   e => { if (KEY_MAP[e.code] && !showingNameInput) { input[KEY_MAP[e.code]] = false; } });
 
 // Touch input
 function handleTouch(e) {
