@@ -27,7 +27,8 @@ function readScores() {
 }
 
 function writeScores(scores) {
-  writeFileSync(SCORES_FILE, JSON.stringify(scores, null, 2));
+  try { writeFileSync(SCORES_FILE, JSON.stringify(scores, null, 2)); }
+  catch (err) { console.error('Failed to write scores:', err); }
 }
 
 function sendJson(res, status, body) {
@@ -49,7 +50,9 @@ async function serveStatic(res, pathname) {
     const info = await stat(absPath);
     if (!info.isFile()) throw new Error();
     res.writeHead(200, { 'Content-Type': MIME[extname(absPath)] ?? 'application/octet-stream' });
-    createReadStream(absPath).pipe(res);
+    const stream = createReadStream(absPath);
+    stream.on('error', () => res.destroy());
+    stream.pipe(res);
   } catch {
     res.writeHead(404);
     res.end('Not found');
@@ -57,31 +60,36 @@ async function serveStatic(res, pathname) {
 }
 
 createServer(async (req, res) => {
-  const { pathname } = new URL(req.url, 'http://localhost');
+  try {
+    const { pathname } = new URL(req.url, 'http://localhost');
 
-  if (pathname === '/api/scores') {
-    if (req.method === 'GET') {
-      return sendJson(res, 200, readScores());
+    if (pathname === '/api/scores') {
+      if (req.method === 'GET') {
+        return sendJson(res, 200, readScores());
+      }
+      if (req.method === 'POST') {
+        let body;
+        try { body = JSON.parse(await collectBody(req)); }
+        catch { return sendJson(res, 400, { error: 'invalid json' }); }
+
+        const name  = (String(body.name ?? 'unknown').trim().substring(0, 14)) || 'unknown';
+        const score = Math.max(0, Math.trunc(Number(body.score) || 0));
+
+        const scores = readScores();
+        const entry  = { name, score };
+        scores.push(entry);
+        scores.sort((a, b) => b.score - a.score);
+        scores.splice(MAX_SCORES);
+        writeScores(scores);
+
+        return sendJson(res, 200, { scores, idx: scores.indexOf(entry) });
+      }
+      res.writeHead(405); return res.end();
     }
-    if (req.method === 'POST') {
-      let body;
-      try { body = JSON.parse(await collectBody(req)); }
-      catch { return sendJson(res, 400, { error: 'invalid json' }); }
 
-      const name  = (String(body.name ?? 'unknown').trim().substring(0, 14)) || 'unknown';
-      const score = Math.max(0, Math.trunc(Number(body.score) || 0));
-
-      const scores = readScores();
-      const entry  = { name, score };
-      scores.push(entry);
-      scores.sort((a, b) => b.score - a.score);
-      scores.splice(MAX_SCORES);
-      writeScores(scores);
-
-      return sendJson(res, 200, { scores, idx: scores.indexOf(entry) });
-    }
-    res.writeHead(405); return res.end();
+    return serveStatic(res, pathname);
+  } catch (err) {
+    console.error('Request error:', err);
+    if (!res.headersSent) { res.writeHead(500); res.end('Internal error'); }
   }
-
-  return serveStatic(res, pathname);
 }).listen(PORT, () => console.log(`Viral Consonance  →  http://localhost:${PORT}`));
