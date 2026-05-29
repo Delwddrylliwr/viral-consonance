@@ -103,6 +103,11 @@ let maxViralLoad = 0;
 let peakChord = null;
 let peakBpm   = BASE_BPM;
 let scoreRevealTriggered = false;
+let mutationHintTimer = 0;
+let celebrationChord  = null;
+let celebrationBpm    = null;
+let eraMaxClones      = 0;
+let eraPeakBpm        = BASE_BPM;
 
 let leaderboardChecked = false;
 let showingNameInput = false;
@@ -117,6 +122,10 @@ async function fetchLeaderboard() {
   const res = await fetch('/api/scores'); // let network errors throw
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
+}
+
+function calcScore() {
+  return Math.round((bpmAccum - BASE_BPM * gameTime) / BPM_PER_CLONE);
 }
 
 function showNameInputOverlay() {
@@ -135,7 +144,7 @@ function showNameInputOverlay() {
       const res  = await fetch('/api/scores', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ name: input.value, score: maxViralLoad }),
+        body:    JSON.stringify({ name: input.value, score: calcScore() }),
       });
       const data = await res.json();
       finalLeaderboard = data.scores;
@@ -162,6 +171,13 @@ function mutatePlayerChord(sourceMotif) {
   };
   const candidates = sourceMotif.filter(n => !player.chord.some(p => sameChroma(p, n)));
   if (candidates.length > 0) {
+    if (eraMaxClones > STARTER_CLONES) {
+      celebrationChord = [...player.baseChord];
+      celebrationBpm   = eraPeakBpm;
+    }
+    eraMaxClones      = 0;
+    eraPeakBpm        = BASE_BPM;
+    mutationHintTimer = 3.5;
     const inherited  = candidates[Math.floor(Math.random() * candidates.length)];
     const replaceIdx = Math.floor(Math.random() * 3);
     player.chord[replaceIdx]     = inherited;
@@ -247,10 +263,16 @@ function init() {
   deathFade          = 0;
   gameTime           = 0;
   bpmAccum           = 0;
-  maxViralLoad       = 0;
-  peakChord          = null;
-  peakBpm            = BASE_BPM;
-  state.dead         = false;
+  maxViralLoad      = 0;
+  peakChord         = null;
+  peakBpm           = BASE_BPM;
+  scoreRevealTriggered = false;
+  mutationHintTimer = 0;
+  celebrationChord  = null;
+  celebrationBpm    = null;
+  eraMaxClones      = 0;
+  eraPeakBpm        = BASE_BPM;
+  state.dead        = false;
   letterBondFlash    = { playerDot: { x: 0, y: 0 }, cellDot: { x: 0, y: 0 }, timer: 0 };
 
   playerVoice = createPlayerVoice();
@@ -332,6 +354,10 @@ function init() {
 }
 
 function triggerDeath() {
+  if (eraMaxClones > STARTER_CLONES) {
+    celebrationChord = [...player.baseChord];
+    celebrationBpm   = eraPeakBpm;
+  }
   dead = true;
   state.dead = true;
   playerVoice.stop();
@@ -381,14 +407,18 @@ function loop(ts) {
     if (deathFade >= 0.95) {
       if (!scoreRevealTriggered) {
         scoreRevealTriggered = true;
-        scoreRevealSound(peakChord ?? [...PLAYER_CHORD], peakBpm);
+        scoreRevealSound(
+          celebrationChord ?? peakChord ?? [...PLAYER_CHORD],
+          celebrationBpm   ?? peakBpm
+        );
       }
       if (!leaderboardChecked) {
         leaderboardChecked = true;
         fetchLeaderboard().then(scores => {
-          const qualifies = maxViralLoad > 0
+          const score = calcScore();
+          const qualifies = score > 0
             && (scores.length < LEADERBOARD_SIZE
-                || maxViralLoad > (scores[scores.length - 1]?.score ?? -1));
+                || score > (scores[scores.length - 1]?.score ?? -1));
           if (qualifies) {
             showNameInputOverlay();
           } else {
@@ -408,14 +438,14 @@ function loop(ts) {
       ctx.fillText('your infection has been contained', cx, cy - 54);
       ctx.font = '26px monospace';
       ctx.fillStyle = '#888';
-      ctx.fillText(`max viral load  ${maxViralLoad}`, cx, cy - 28);
+      ctx.fillText(`viral spread  ${calcScore()}`, cx, cy - 28);
       ctx.font = '20px monospace';
-      ctx.fillText(`(avg ${avgBpm} BPM)`, cx, cy - 2);
+      ctx.fillText(`(peak ${maxViralLoad} clones · avg ${avgBpm} BPM)`, cx, cy - 2);
 
       if (finalLeaderboard !== null && finalLeaderboard.length > 0) {
         ctx.font = '12px monospace';
         ctx.fillStyle = '#555';
-        ctx.fillText('top viral loads', cx, cy + 22);
+        ctx.fillText('top viral spreads', cx, cy + 22);
         for (let i = 0; i < finalLeaderboard.length; i++) {
           const e   = finalLeaderboard[i];
           const ey  = cy + 37 + i * 15;
@@ -452,6 +482,8 @@ function loop(ts) {
     peakChord    = [...player.chord];
     peakBpm      = getBPM();
   }
+  if (clones.length > eraMaxClones) eraMaxClones = clones.length;
+  if (getBPM()       > eraPeakBpm)  eraPeakBpm   = getBPM();
 
   for (const c of clones) c.update(dt);
   setTempo(BASE_BPM + clones.length * BPM_PER_CLONE);
@@ -821,6 +853,17 @@ function loop(ts) {
   const blastDanger  = blasts.some(b => !b.dead && Math.hypot(b.x - player.x, b.y - player.y) <= b.maxRadius) ? 1 : 0;
   const dangerIntensity = Math.max(bpmDanger, latchDanger, blastDanger);
   drawDangerBorder(ctx, dangerIntensity, now);
+
+  if (mutationHintTimer > 0) {
+    mutationHintTimer = Math.max(0, mutationHintTimer - dt);
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, mutationHintTimer);
+    ctx.fillStyle = '#8af';
+    ctx.font = '13px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('chord mutated — viral spread still accumulating', canvas.width / 2, 28);
+    ctx.restore();
+  }
 
   requestAnimationFrame(loop);
 }
