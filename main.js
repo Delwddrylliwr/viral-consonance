@@ -508,8 +508,10 @@ function loop(ts) {
     }
   }
 
-  // Shake detection — computed once, used for both proteins and antibodies
-  const playerShook = player.detectShake(now);
+  // Shake detection — three tiers: complement (easy) < phage/nphil (medium) < antibody (hard)
+  const playerShook  = player.detectShake(now);
+  const mediumShake  = playerShook && Math.hypot(player.vx, player.vy) > 100;
+  const hardShake    = playerShook && Math.hypot(player.vx, player.vy) > 160;
 
   // Protein shake-off (only play sound when something actually detaches)
   if (playerShook) {
@@ -582,8 +584,11 @@ function loop(ts) {
   // Immune system — immune alert decays over time
   immuneAlertLevel = Math.max(0, immuneAlertLevel - 0.08 * dt);
 
-  // Player dissonance: how far the player's current chord has drifted from the base (due to proteins/antibodies)
-  const playerDissonance = roughness(player.chord, PLAYER_CHORD, DEFAULT_TIMBRE);
+  // playerDissonance: drift from original tonic chord — used for blast lethality
+  // attachmentDissonance: drift from player's own baseChord — used for phage/nphil targeting
+  // (attachmentDissonance is 0 when no proteins/antibodies are attached, regardless of mutation)
+  const playerDissonance     = roughness(player.chord, PLAYER_CHORD,        DEFAULT_TIMBRE);
+  const attachmentDissonance = roughness(player.chord, player.baseChord,    DEFAULT_TIMBRE);
   const attachedProteinCount = proteins.filter(p => p.attached).length;
 
   // T-cell and B-cell adaptation: grow proportional to BPM, reset when player chord mutates
@@ -648,7 +653,7 @@ function loop(ts) {
   if (macrophages.length > MACROPHAGE_MAX) macrophages.length = MACROPHAGE_MAX;
 
   for (const m of macrophages) {
-    m.update(dt, clones, beatPhase, player, playerDissonance, tcellAdaptation);
+    m.update(dt, clones, beatPhase, player, attachmentDissonance, tcellAdaptation);
 
     // Macrophage eats player: contact starts a 2s eat window; shake to escape
     if (m.targetingPlayer && !m.eatingPlayer
@@ -659,7 +664,7 @@ function loop(ts) {
     }
     if (m.eatingPlayer) {
       m.eatTimer -= dt;
-      if (playerShook) {
+      if (mediumShake) {
         m.eatingPlayer = false;
         m.targetingPlayer = false;
       } else if (m.eatTimer <= 0 && !dead) {
@@ -695,7 +700,7 @@ function loop(ts) {
     if (!n.attachedToPlayer && !n.attached) {
       const distToPlayer = Math.hypot(n.x - player.x, n.y - player.y);
       const shouldTargetPlayer =
-        (playerDissonance > 0.25 && distToPlayer < 150) ||
+        (attachmentDissonance > 0.25 && distToPlayer < 150) ||
         (immuneAlertLevel >= ALERT_THRESHOLD_NPHIL_PLAYER && clones.length === 0);
       n.targetingPlayer = shouldTargetPlayer;
       n.playerTarget    = shouldTargetPlayer ? player : null;
@@ -711,7 +716,7 @@ function loop(ts) {
       n.attachedToPlayer = true;
       n.playerFuseBeats  = 0;
     }
-    if (n.attachedToPlayer && playerShook) {
+    if (n.attachedToPlayer && mediumShake) {
       n.attachedToPlayer = false;
       n.targetingPlayer  = false;
     }
@@ -772,8 +777,6 @@ function loop(ts) {
   }
 
 
-  // Harder antibody shake-off: requires a more forceful direction reversal
-  const hardShake = playerShook && Math.hypot(player.vx, player.vy) > 160;
   for (let i = antibodies.length - 1; i >= 0; i--) {
     const ab = antibodies[i];
     ab.update(dt, player);
