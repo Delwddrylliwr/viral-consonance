@@ -25,8 +25,8 @@ const KEY_MAP = {
   ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down',
   ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right',
 };
-window.addEventListener('keydown', e => { if (KEY_MAP[e.code]) { input[KEY_MAP[e.code]] = true;  e.preventDefault(); } });
-window.addEventListener('keyup',   e => { if (KEY_MAP[e.code]) { input[KEY_MAP[e.code]] = false; } });
+window.addEventListener('keydown', e => { if (KEY_MAP[e.code] && !showingNameInput) { input[KEY_MAP[e.code]] = true;  e.preventDefault(); } });
+window.addEventListener('keyup',   e => { if (KEY_MAP[e.code] && !showingNameInput) { input[KEY_MAP[e.code]] = false; } });
 
 // Touch input
 function handleTouch(e) {
@@ -108,6 +108,7 @@ let celebrationChord  = null;
 let celebrationBpm    = null;
 let eraMaxClones      = 0;
 let eraPeakBpm        = BASE_BPM;
+let bounceTargetTimer = 0; // decays after dissonant cell bounces, adds to phage player-targeting
 
 let leaderboardChecked = false;
 let showingNameInput = false;
@@ -272,6 +273,7 @@ function init() {
   celebrationBpm    = null;
   eraMaxClones      = 0;
   eraPeakBpm        = BASE_BPM;
+  bounceTargetTimer = 0;
   state.dead        = false;
   letterBondFlash    = { playerDot: { x: 0, y: 0 }, cellDot: { x: 0, y: 0 }, timer: 0 };
 
@@ -572,7 +574,8 @@ function loop(ts) {
     } else {
       bouncePlayer(player, c, r);
       dissonantStab(pNote, cNote);
-      immuneAlertLevel = Math.min(1.0, immuneAlertLevel + 0.3);
+      immuneAlertLevel  = Math.min(1.0, immuneAlertLevel + 0.3);
+      bounceTargetTimer = Math.min(1, bounceTargetTimer + 0.5); // stacks up to 2 bounces
       setTempo(BASE_BPM + clones.length * BPM_PER_CLONE);
       setMasterVolume(getBPM());
     }
@@ -585,11 +588,15 @@ function loop(ts) {
   immuneAlertLevel = Math.max(0, immuneAlertLevel - 0.08 * dt);
 
   // playerDissonance: drift from original tonic chord — used for blast lethality
-  // attachmentDissonance: drift from player's own baseChord — used for phage/nphil targeting
-  // (attachmentDissonance is 0 when no proteins/antibodies are attached, regardless of mutation)
-  const playerDissonance     = roughness(player.chord, PLAYER_CHORD,        DEFAULT_TIMBRE);
-  const attachmentDissonance = roughness(player.chord, player.baseChord,    DEFAULT_TIMBRE);
-  const attachedProteinCount = proteins.filter(p => p.attached).length;
+  const playerDissonance  = roughness(player.chord, PLAYER_CHORD, DEFAULT_TIMBRE);
+  // attachmentDissonance: 0→1 based on proteins/antibodies currently latched to player.
+  // Using roughness(chord, baseChord) gives non-zero even with no attachments (self-interaction
+  // of chord notes), so we count attachments explicitly instead.
+  const attachedProteinCount  = proteins.filter(p => p.attached).length;
+  const attachedAntibodyCount = antibodies.filter(ab => ab.attached).length;
+  bounceTargetTimer = Math.max(0, bounceTargetTimer - dt / 3); // fades over ~3 s
+  const attachmentDissonance  = Math.min(1,
+    (attachedProteinCount + attachedAntibodyCount) / 3 + bounceTargetTimer * 0.5);
 
   // T-cell and B-cell adaptation: grow proportional to BPM, reset when player chord mutates
   {
