@@ -89,7 +89,7 @@ let antibodySpawnTimer  = 15;
 let tcellRespawnTimer   = 0;
 let immuneAlertLevel = 0;
 let tcellAdaptation  = 0; // 0→1, grows ∝ BPM, resets on chord mutation
-let bcellAdaptation  = 0; // same, but controls neutrophil rate (slower base ramp)
+let bcellAdaptation  = 0; // grows with BPM/clone-load; caps n-phil max and gates a-body launches
 let tcellAdaptKnownChord = null;
 let bcellAdaptKnownChord = null;
 let nphilSpawnTimer  = 0;
@@ -696,11 +696,12 @@ function loop(ts) {
     }
   }
 
-  // Neutrophils: spawn rate and max count scale with B-cell adaptation (not alert level)
+  // Neutrophils: spawn interval driven by immune alert spikes; adaptation sets the max-count ceiling
   neutrophils = neutrophils.filter(n => !n.dead);
   nphilSpawnTimer = Math.max(0, nphilSpawnTimer - dt);
-  const nphilMaxCount      = Math.floor(bcellAdaptation * 4) + 1;         // 1 → 5
-  const nphilSpawnInterval = Math.max(3, 20 - bcellAdaptation * 17);      // 20s → 3s
+  const nphilAdaptCap      = Math.floor(bcellAdaptation * 4) + 1;         // ceiling 1 → 5 as B-cells adapt
+  const nphilMaxCount      = Math.min(nphilAdaptCap, Math.floor(immuneAlertLevel * 4) + 1); // alert spikes fill up to cap
+  const nphilSpawnInterval = Math.max(3, 20 - immuneAlertLevel * 17);     // 20s → 3s as alert rises
   if (neutrophils.length < nphilMaxCount && clones.length > 0 && nphilSpawnTimer <= 0) {
     neutrophils.push(new Neutrophil(...randomEdgePos()));
     nphilSpawnTimer = nphilSpawnInterval;
@@ -767,7 +768,7 @@ function loop(ts) {
     bc.update(dt, player, canvas.width / 2, canvas.height / 2);
     // Launch antibodies from this B-cell (replaces freestanding antibody timer)
     const playerNearBCell = Math.hypot(bc.x - player.x, bc.y - player.y) < 300;
-    if (bc.launchTimer <= 0 && (immuneAlertLevel >= ALERT_THRESHOLD_ANTIBODY || playerNearBCell)
+    if (bc.launchTimer <= 0 && (bcellAdaptation > 0 || playerNearBCell)
         && antibodies.filter(ab => !ab.attached).length < 2) {
       const noteIdx = Math.floor(Math.random() * 3);
       antibodies.push(new Antibody(bc.x, bc.y, noteIdx, ANTIBODY_FREQS[noteIdx]));
