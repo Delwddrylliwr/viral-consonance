@@ -601,15 +601,19 @@ function loop(ts) {
   const attachmentDissonance  = Math.min(1,
     (attachedProteinCount + attachedAntibodyCount) / 3 + bounceTargetTimer * 0.5);
 
-  // T-cell and B-cell adaptation: grow proportional to BPM, reset when player chord mutates
+  // T-cell and B-cell adaptation: grow proportional to BPM, reset when player chord mutates;
+  // evasion (player proximity) accelerates each cell type's own adaptation independently
   {
-    const chordKey = player.baseChord.join(',');
+    const chordKey     = player.baseChord.join(',');
+    const tcellEvading = tcells.some(tc => tc.isEvading);
+    const bcellFleeing = bcells.some(bc => Math.hypot(bc.x - player.x, bc.y - player.y) < 300);
+    const baseBpmRate  = dt * (getBPM() / BASE_BPM);
     if (tcellAdaptKnownChord !== null && tcellAdaptKnownChord !== chordKey) tcellAdaptation = 0;
     tcellAdaptKnownChord = chordKey;
-    tcellAdaptation = Math.min(1, tcellAdaptation + dt * (getBPM() / BASE_BPM) / 60);
+    tcellAdaptation = Math.min(1, tcellAdaptation + baseBpmRate / 60 * (tcellEvading ? 3 : 1));
     if (bcellAdaptKnownChord !== null && bcellAdaptKnownChord !== chordKey) bcellAdaptation = 0;
     bcellAdaptKnownChord = chordKey;
-    bcellAdaptation = Math.min(1, bcellAdaptation + dt * (getBPM() / BASE_BPM) / 120);
+    bcellAdaptation = Math.min(1, bcellAdaptation + baseBpmRate / 120 * (bcellFleeing ? 3 : 1));
   }
 
   // T-cell: respawns after a delay (longer if last one was neutralised by player)
