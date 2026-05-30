@@ -109,6 +109,7 @@ let celebrationBpm    = null;
 let eraMaxClones      = 0;
 let eraPeakBpm        = BASE_BPM;
 let bounceTargetTimer = 0; // decays after dissonant cell bounces, adds to phage player-targeting
+let cloneExpAccum     = 0; // ∫ R^clones dt, R=1.05 — exponential viral-spread score
 
 let leaderboardChecked = false;
 let showingNameInput = false;
@@ -126,7 +127,7 @@ async function fetchLeaderboard() {
 }
 
 function calcScore() {
-  return Math.round((bpmAccum - BASE_BPM * gameTime) / BPM_PER_CLONE);
+  return Math.round(cloneExpAccum);
 }
 
 function showNameInputOverlay() {
@@ -274,6 +275,7 @@ function init() {
   eraMaxClones      = 0;
   eraPeakBpm        = BASE_BPM;
   bounceTargetTimer = 0;
+  cloneExpAccum     = 0;
   state.dead        = false;
   letterBondFlash    = { playerDot: { x: 0, y: 0 }, cellDot: { x: 0, y: 0 }, timer: 0 };
 
@@ -486,6 +488,7 @@ function loop(ts) {
   }
   if (clones.length > eraMaxClones) eraMaxClones = clones.length;
   if (getBPM()       > eraPeakBpm)  eraPeakBpm   = getBPM();
+  cloneExpAccum += Math.pow(1.05, clones.length) * dt;
 
   for (const c of clones) c.update(dt);
   setTempo(BASE_BPM + clones.length * BPM_PER_CLONE);
