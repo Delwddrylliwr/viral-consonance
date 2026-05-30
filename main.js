@@ -699,7 +699,7 @@ function loop(ts) {
   // Neutrophils: spawn interval driven by immune alert spikes; adaptation sets the max-count ceiling
   neutrophils = neutrophils.filter(n => !n.dead);
   nphilSpawnTimer = Math.max(0, nphilSpawnTimer - dt);
-  const nphilMaxCount      = Math.floor(immuneAlertLevel * 4) + 1;         // 1 → 5 as alert rises
+  const nphilMaxCount      = Math.floor(tcellAdaptation * 4) + 1;          // 1 → 5 as T-cells adapt
   const nphilSpawnInterval = Math.max(3, 20 - bcellAdaptation * 17);      // 20s → 3s as B-cells adapt
   if (neutrophils.length < nphilMaxCount && clones.length > 0 && nphilSpawnTimer <= 0) {
     neutrophils.push(new Neutrophil(...randomEdgePos()));
