@@ -16,4 +16,5 @@ export const state = {
   immuneAlert: 0,
   bcellFamiliarity: 0,
   dead: false,
+  rpmMultiplier: 1,
 };
