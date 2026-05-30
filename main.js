@@ -492,6 +492,8 @@ function loop(ts) {
 
   for (const c of clones) c.update(dt);
   setTempo(BASE_BPM + clones.length * BPM_PER_CLONE);
+  // Rotation speed scales with viral load: 1× at start (8 clones / 100 BPM), grows with BPM
+  state.rpmMultiplier = (BASE_BPM + clones.length * BPM_PER_CLONE) / (BASE_BPM + STARTER_CLONES * BPM_PER_CLONE);
 
   // Beat phase 0–1 for macrophage erratic movement (0 = just hit beat)
   const beatDuration = 60 / getBPM();

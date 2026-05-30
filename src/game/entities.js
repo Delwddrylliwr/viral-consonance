@@ -1,4 +1,5 @@
 import { PLAYER_CHORD } from '../audio/scale.js';
+import { state } from '../game/state.js';
 
 // Dissonant substitutes for player chord notes [C4, E4, G4]:
 // half-step neighbours to maximise roughness when attached.
@@ -51,7 +52,7 @@ export class Player {
     this.velHistory = this.velHistory.filter(e => now - e.t < 0.45);
     this.x += this.vx * dt;
     this.y += this.vy * dt;
-    this.rotation += this.rotationSpeed * dt;
+    this.rotation += this.rotationSpeed * (state.rpmMultiplier ?? 1) * dt;
   }
 
   detectShake(now) {
@@ -105,7 +106,7 @@ export class Cell {
   }
 
   update(dt) {
-    this.rotation += this.rotationSpeed * dt;
+    this.rotation += this.rotationSpeed * (state.rpmMultiplier ?? 1) * dt;
     if (this.flashTimer > 0) this.flashTimer = Math.max(0, this.flashTimer - dt);
     if (this.active) {
       this.x += this.dx * dt;
@@ -388,7 +389,7 @@ export class TCell {
   }
 
   update(dt, clones, player) {
-    this.angle += dt * 0.4;
+    this.angle += dt * 0.4 * (state.rpmMultiplier ?? 1);
     this.escalationCooldown = Math.max(0, this.escalationCooldown - dt);
     this.burstCooldown = Math.max(0, this.burstCooldown - dt);
     this.scanTimer -= dt;
@@ -615,7 +616,7 @@ export class BCell {
   }
 
   update(dt, player, screenHalfW, screenHalfH) {
-    this.rotation += this.rotationSpeed * dt;
+    this.rotation += this.rotationSpeed * (state.rpmMultiplier ?? 1) * dt;
     this.launchTimer = Math.max(0, this.launchTimer - dt);
     if (this.flashTimer > 0) this.flashTimer = Math.max(0, this.flashTimer - dt);
 
