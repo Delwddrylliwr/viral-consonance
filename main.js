@@ -706,11 +706,12 @@ function loop(ts) {
     nphilSpawnTimer = nphilSpawnInterval;
   }
   for (const n of neutrophils) {
+    n.playerLatchCooldown = Math.max(0, n.playerLatchCooldown - dt);
     // Targeting: player is a target if dissonant and close (lure tactic), or as fallback at extreme alert
     if (!n.attachedToPlayer && !n.attached) {
       const distToPlayer = Math.hypot(n.x - player.x, n.y - player.y);
       const shouldTargetPlayer =
-        (attachmentDissonance > 0.25 && distToPlayer < 150) ||
+        (n.playerLatchCooldown <= 0 && attachmentDissonance > 0.25 && distToPlayer < 150) ||
         (immuneAlertLevel >= ALERT_THRESHOLD_NPHIL_PLAYER && clones.length === 0);
       n.targetingPlayer = shouldTargetPlayer;
       n.playerTarget    = shouldTargetPlayer ? player : null;
@@ -727,8 +728,9 @@ function loop(ts) {
       n.playerFuseBeats  = 0;
     }
     if (n.attachedToPlayer && mediumShake) {
-      n.attachedToPlayer = false;
-      n.targetingPlayer  = false;
+      n.attachedToPlayer    = false;
+      n.targetingPlayer     = false;
+      n.playerLatchCooldown = 3.0;
     }
   }
 
@@ -848,7 +850,7 @@ function loop(ts) {
   for (const tc of tcells) {
     const pn = player.getActiveNote(tc.x, tc.y);
     const tn = tc.getActiveNote(player.x, player.y);
-    drawTCell(ctx, tc, roughness([pn], [tn], DEFAULT_TIMBRE) < TCELL_CAPTURE_THRESHOLD, immuneAlertLevel);
+    drawTCell(ctx, tc, roughness([pn], [tn], DEFAULT_TIMBRE) < TCELL_CAPTURE_THRESHOLD, immuneAlertLevel, tcellAdaptation);
   }
   for (const ab of antibodies) drawAntibody(ctx, ab);
   for (const n of neutrophils) if (!n.dead) drawNeutrophil(ctx, n);

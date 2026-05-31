@@ -24,8 +24,8 @@ export class Player {
     this.x = x;
     this.y = y;
     this.radius = 30;
-    this.accel  = 700;  // px/s² — snappy acceleration
-    this.drag   = 3.5;  // exponential decay rate; terminal speed ≈ 200 px/s under input
+    this.accel  = 400;  // px/s² — terminal speed ≈ 200 px/s under input (accel/drag)
+    this.drag   = 2.0;  // exponential decay rate; ~0.5s to reach terminal (was 0.29s)
     this.baseChord = [...PLAYER_CHORD];
     this.chord     = [...PLAYER_CHORD];
     this.rotation      = 0;
@@ -507,9 +507,10 @@ export class Neutrophil {
     this.dead        = false;
     this.jitterAngle = Math.random() * Math.PI * 2;
     this.jitterTimer = 0;
-    this.targetingPlayer = false;
-    this.playerFuseBeats = 0;
-    this.attachedToPlayer = false;
+    this.targetingPlayer    = false;
+    this.playerFuseBeats    = 0;
+    this.attachedToPlayer   = false;
+    this.playerLatchCooldown = 0; // s — prevents immediate re-attach after shake-off
   }
 
   update(dt, clones) {
