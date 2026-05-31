@@ -1,0 +1,20 @@
+[Unit]
+Description=Viral Consonance high-scores server
+After=network.target
+
+[Service]
+Type=simple
+# Edit these two lines to match your VM user and repo path
+User=YOUR_USER
+WorkingDirectory=/home/YOUR_USER/viral-consonance
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+# PORT defaults to 3000; uncomment and set if you need a different port
+# Environment=PORT=3000
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
