@@ -268,7 +268,8 @@ export class Macrophage {
 
   update(dt, clones, beatPhase, player, playerDissonance, tcellAdaptation) {
     this.burstTimer = Math.max(0, this.burstTimer - dt);
-    const spd = this.burstTimer > 0 ? this.speed * 1.8 : this.speed;
+    const adaptedSpeed = this.speed * (1 + (tcellAdaptation || 0) * 0.8); // up to 1.8× at full adaptation
+    const spd = this.burstTimer > 0 ? adaptedSpeed * 1.8 : adaptedSpeed;
     if (this.eatingPlayer && player) {
       this.x = player.x;
       this.y = player.y;
