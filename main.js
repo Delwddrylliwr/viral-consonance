@@ -444,7 +444,7 @@ function loop(ts) {
       ctx.fillStyle = '#888';
       ctx.fillText(`viral spread  ${calcScore()}`, cx, cy - 28);
       ctx.font = '20px monospace';
-      ctx.fillText(`(peak ${maxViralLoad} clones · avg ${avgBpm} BPM)`, cx, cy - 2);
+      ctx.fillText(`(peak ${maxViralLoad} virions · avg ${avgBpm} BPM)`, cx, cy - 2);
 
       if (finalLeaderboard !== null && finalLeaderboard.length > 0) {
         ctx.font = '12px monospace';
