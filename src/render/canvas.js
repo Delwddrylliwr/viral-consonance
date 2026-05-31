@@ -297,7 +297,7 @@ export function drawMacrophage(ctx, m, time) {
 
 // Slowly rotating square — 4-note motif at corners, visible when matchable (player fully loaded with proteins)
 // immuneAlert: 0–1 drives green→yellow→red colour shift plus visual intensity cues
-export function drawTCell(ctx, tc, matchable = false, immuneAlert = 0) {
+export function drawTCell(ctx, tc, matchable = false, immuneAlert = 0, tcellAdaptation = 0) {
   // Base colour: green→yellow→red along alert level; purple overrides when vulnerable
   const hue   = 120 - immuneAlert * 120;          // 120 (green) → 0 (red)
   const sat   = 65 + immuneAlert * 25;             // 65% → 90%
@@ -335,6 +335,19 @@ export function drawTCell(ctx, tc, matchable = false, immuneAlert = 0) {
     : `hsla(${hue}, ${sat}%, ${light}%, ${fillAlpha})`;
   ctx.fill();
   ctx.restore();
+
+  // T-cell adaptation arc — fills clockwise; colour shifts yellow-green → orange
+  if (tcellAdaptation > 0) {
+    ctx.save();
+    ctx.globalAlpha = 0.75;
+    ctx.beginPath();
+    ctx.arc(tc.x, tc.y, tc.radius * Math.SQRT2 + 7, -Math.PI / 2,
+            -Math.PI / 2 + tcellAdaptation * Math.PI * 2);
+    ctx.strokeStyle = `hsl(${80 - tcellAdaptation * 80}, 100%, 60%)`;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    ctx.restore();
+  }
 
   // Motif notes at the 4 corners (faint at low alert; bold when matchable)
   const noteAlpha = matchable ? 0.9 : Math.max(0.2, immuneAlert * 0.7);
@@ -454,6 +467,12 @@ export function drawNeutrophil(ctx, n) {
     ctx.beginPath();
     ctx.arc(0, 0, n.radius + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (n.fuseBeats / 4), false);
     ctx.strokeStyle = '#ff6600';
+    ctx.lineWidth   = 2.5;
+    ctx.stroke();
+  } else if (n.attachedToPlayer && n.playerFuseBeats > 0) {
+    ctx.beginPath();
+    ctx.arc(0, 0, n.radius + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (n.playerFuseBeats / 3), false);
+    ctx.strokeStyle = '#ff2200';
     ctx.lineWidth   = 2.5;
     ctx.stroke();
   }
