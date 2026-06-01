@@ -517,8 +517,8 @@ function loop(ts) {
 
   // Shake detection — three tiers: complement (easy) < phage/nphil (medium) < antibody (hard)
   const playerShook  = player.detectShake(now);
-  const mediumShake  = playerShook && Math.hypot(player.vx, player.vy) > 100;
-  const hardShake    = playerShook && Math.hypot(player.vx, player.vy) > 160;
+  const mediumShake  = playerShook && Math.hypot(player.vx, player.vy) > 50;
+  const hardShake    = playerShook && Math.hypot(player.vx, player.vy) > 100;
 
   // Protein shake-off (only play sound when something actually detaches)
   if (playerShook) {
