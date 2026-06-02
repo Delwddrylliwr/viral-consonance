@@ -471,7 +471,7 @@ export function drawNeutrophil(ctx, n) {
     ctx.stroke();
   } else if (n.attachedToPlayer && n.playerFuseBeats > 0) {
     ctx.beginPath();
-    ctx.arc(0, 0, n.radius + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (n.playerFuseBeats / 3), false);
+    ctx.arc(0, 0, n.radius + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (n.playerFuseBeats / 5), false);
     ctx.strokeStyle = '#ff2200';
     ctx.lineWidth   = 2.5;
     ctx.stroke();
