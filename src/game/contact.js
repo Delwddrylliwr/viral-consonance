@@ -24,7 +24,7 @@ export function bouncePlayer(player, cell, r = 0.5) {
   player.vx += nx * impulse;
   player.vy += ny * impulse;
   // Clear velocity history so the impulse doesn't immediately trigger protein shake-off
-  player.velHistory = [];
+  // player.velHistory = [];
 }
 
 // Weighted cell type: type 0 (easy, consonant at normal tonality) most common;
