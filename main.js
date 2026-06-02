@@ -304,7 +304,7 @@ function init() {
       if (n.attachedToPlayer) {
         n.playerFuseBeats++;
         playNeutrophilTick(n.playerFuseBeats);
-        if (n.playerFuseBeats >= 3) {
+        if (n.playerFuseBeats >= 5) {
           n.dead = true;
           playNeutrophilExplode();
           const blastR = BLAST_RADIUS_BASE + BLAST_RADIUS_SCALE * immuneAlertLevel;
@@ -518,7 +518,7 @@ function loop(ts) {
   // Shake detection — three tiers: complement (easy) < phage/nphil (medium) < antibody (hard)
   const playerShook  = player.detectShake(now);
   const mediumShake  = playerShook && Math.hypot(player.vx, player.vy) > 25;
-  const hardShake    = playerShook && Math.hypot(player.vx, player.vy) > 50;
+  const hardShake    = playerShook && Math.hypot(player.vx, player.vy) > 75;
 
   // Protein shake-off (only play sound when something actually detaches)
   if (playerShook) {
