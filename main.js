@@ -171,7 +171,7 @@ function mutatePlayerChord(sourceMotif) {
     const oct = Math.log2(f1 > f2 ? f1 / f2 : f2 / f1);
     return Math.abs(oct - Math.round(oct)) < 0.02;
   };
-  const candidates = sourceMotif.filter(n => !player.chord.some(p => sameChroma(p, n)));
+  const candidates = sourceMotif.filter(n => !player.baseChord.some(p => sameChroma(p, n)));
   if (candidates.length > 0) {
     if (eraMaxClones > STARTER_CLONES) {
       celebrationChord = [...player.baseChord];
