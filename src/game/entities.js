@@ -268,7 +268,7 @@ export class Macrophage {
 
   update(dt, clones, beatPhase, player, playerDissonance, tcellAdaptation) {
     this.burstTimer = Math.max(0, this.burstTimer - dt);
-    const adaptedSpeed = this.speed * (1 + (tcellAdaptation || 0) * 0.8); // up to 1.8× at full adaptation
+    const adaptedSpeed = this.speed * (1 + (tcellAdaptation || 0)); // up to 2× at full adaptation
     const spd = this.burstTimer > 0 ? adaptedSpeed * 1.8 : adaptedSpeed;
     if (this.eatingPlayer && player) {
       this.x = player.x;
@@ -290,11 +290,11 @@ export class Macrophage {
     }
 
     this.retargetTimer -= dt;
-    if (this.retargetTimer <= 0) {
+    if (this.retargetTimer <= 0 || !this.target ) {
       const dissonance = playerDissonance || 0;
       const adaptation = tcellAdaptation || 0;
       // Probability of targeting player scales directly with player dissonance (complement + antibodies)
-      if (player && Math.random() < dissonance) {
+      if (player && Math.random() < dissonance + 0.5 * adaptation) {
         this.targetingPlayer = true;
         this.target = null;
       } else {
@@ -304,9 +304,9 @@ export class Macrophage {
           ? clones[Math.floor(Math.random() * clones.length)]
           : null;
       }
-      // Retarget interval: shrinks as T-cells adapt (3s → 0.5s); player dissonance speeds it up further
-      const baseInterval   = 3.0 - adaptation * 2.5;
-      const dissonanceBoost = 1 - dissonance * 0.7;
+      // Retarget interval: increases as T-cells adapt (3s → 0.5s); player dissonance slows it down further
+      const baseInterval   = adaptation * 3.0;
+      const dissonanceBoost = 0.5 + dissonance * 0.5;
       this.retargetTimer = Math.max(0.3, baseInterval * dissonanceBoost + (Math.random() - 0.5) * 0.4);
     }
 
@@ -419,7 +419,7 @@ export class TCell {
 
         // Speed burst when player gets very close — last-ditch escape
         const closeFactor = eDist < 80 ? 1.35 : 1.0;
-        const evadeSpeed  = this.speed * 1.38 * closeFactor; // ~113–153 px/s vs player ~200 max
+        const evadeSpeed  = this.speed * 1.25 * closeFactor; // ~113–153 px/s vs player ~200 max
 
         const nx = edx / eDist, ny = edy / eDist;
         // Perpendicular direction; strafe weight fades toward zero as player approaches catch range
@@ -582,17 +582,10 @@ export class BCell {
     this.flashTimer  = 0;
     this.launchTimer = 8 + Math.random() * 6; // time until first antibody launch
     this.speed       = 60;   // slow enough to be catchable
-    this.fleeSpeed   = 95;   // faster when player is close
+    this.fleeSpeed   = 150;   // faster when player is close
     this.color       = '#a3f';
     // 8-note motif at octagon corners (based on antibody freq harmonics)
     this.motif = [369.99, 392.00, 415.30, 440.00, 466.16, 493.88, 523.25, 554.37];
-    this.familiarity = 0;    // 0→1; grows over time, resets when player chord mutates
-    this.knownChord  = null; // serialised snapshot for change detection
-  }
-
-  // Spawn interval shrinks from 18s (unfamiliar) to 4s (fully learned)
-  getSpawnInterval() {
-    return 18 - this.familiarity * 14;
   }
 
   getDots() {
@@ -621,14 +614,6 @@ export class BCell {
     this.rotation += this.rotationSpeed * (state.rpmMultiplier ?? 1) * dt;
     this.launchTimer = Math.max(0, this.launchTimer - dt);
     if (this.flashTimer > 0) this.flashTimer = Math.max(0, this.flashTimer - dt);
-
-    // Adaptive learning: reset familiarity when player chord changes (mutation occurred)
-    const chordKey = player.baseChord.join(',');
-    if (this.knownChord !== chordKey) {
-      if (this.knownChord !== null) this.familiarity = 0;
-      this.knownChord = chordKey;
-    }
-    this.familiarity = Math.min(1, this.familiarity + dt / 90); // ~90s to fully learn
 
     const toPlayerX = player.x - this.x;
     const toPlayerY = player.y - this.y;

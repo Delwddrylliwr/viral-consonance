@@ -366,7 +366,7 @@ export function drawTCell(ctx, tc, matchable = false, immuneAlert = 0, tcellAdap
 }
 
 // Octagon B-cell that launches antibodies; flees off-screen
-export function drawBCell(ctx, bc, activeFreq = null) {
+export function drawBCell(ctx, bc, activeFreq = null, adaptation = 0) {
   const alpha = bc.flashTimer > 0 ? 0.5 + 0.5 * (bc.flashTimer / 0.5) : 0.6;
   const color = bc.flashTimer > 0 ? '#fff' : bc.color;
 
@@ -388,14 +388,14 @@ export function drawBCell(ctx, bc, activeFreq = null) {
   ctx.fill();
   ctx.restore();
 
-  // Threat arc — fills clockwise as familiarity grows; colour shifts orange → red
-  if (bc.familiarity > 0) {
+  // Threat arc — fills clockwise as adaptation grows; colour shifts orange → red
+  if (adaptation > 0) {
     ctx.save();
     ctx.globalAlpha = 0.75;
     ctx.beginPath();
     ctx.arc(bc.x, bc.y, bc.radius + 7, -Math.PI / 2,
-            -Math.PI / 2 + bc.familiarity * Math.PI * 2);
-    ctx.strokeStyle = `hsl(${30 - bc.familiarity * 30}, 100%, 60%)`;
+            -Math.PI / 2 + adaptation * Math.PI * 2);
+    ctx.strokeStyle = `hsl(${30 - adaptation * 30}, 100%, 60%)`;
     ctx.lineWidth = 2.5;
     ctx.stroke();
     ctx.restore();

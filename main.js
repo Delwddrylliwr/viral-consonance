@@ -49,7 +49,7 @@ canvas.addEventListener('touchmove',   handleTouch, { passive: false });
 canvas.addEventListener('touchend',    handleTouch, { passive: false });
 canvas.addEventListener('touchcancel', handleTouch, { passive: false });
 
-const MAX_CELLS        = 5;   // target active cell count
+const MAX_CELLS        = 10;  // target active cell count (2× original to match mid-distance spawn ring)
 const PROTEIN_TARGET   = 8;   // target free-floating protein count
 const PROTEIN_RANGE    = 800; // remove proteins that wander beyond this radius
 
@@ -171,7 +171,7 @@ function mutatePlayerChord(sourceMotif) {
     const oct = Math.log2(f1 > f2 ? f1 / f2 : f2 / f1);
     return Math.abs(oct - Math.round(oct)) < 0.02;
   };
-  const candidates = sourceMotif.filter(n => !player.chord.some(p => sameChroma(p, n)));
+  const candidates = sourceMotif.filter(n => !player.baseChord.some(p => sameChroma(p, n)));
   if (candidates.length > 0) {
     if (eraMaxClones > STARTER_CLONES) {
       celebrationChord = [...player.baseChord];
@@ -228,7 +228,6 @@ function init() {
 
   player = new Player(cx, cy);
 
-  // Start with two guaranteed type-0 (easy) cells close by, then fill with variety
   cells = [
     new Cell(cx + 220, cy - 60,  0),
     new Cell(cx - 180, cy + 100, 0),
@@ -295,7 +294,7 @@ function init() {
     state.macrophageCount = macrophages.length;
     state.tcellCount       = tcells.length;
     state.immuneAlert      = immuneAlertLevel;
-    state.bcellFamiliarity = bcells.reduce((m, b) => Math.max(m, b.familiarity), 0);
+    state.bcellFamiliarity = bcellAdaptation;
     state.tcellAdaptation  = tcellAdaptation;
     state.bcellAdaptation  = bcellAdaptation;
 
@@ -518,7 +517,7 @@ function loop(ts) {
   // Shake detection — three tiers: complement (easy) < phage/nphil (medium) < antibody (hard)
   const playerShook  = player.detectShake(now);
   const mediumShake  = playerShook && Math.hypot(player.vx, player.vy) > 25;
-  const hardShake    = playerShook && Math.hypot(player.vx, player.vy) > 75;
+  const hardShake    = playerShook && Math.hypot(player.vx, player.vy) > 100;
 
   // Protein shake-off (only play sound when something actually detaches)
   if (playerShook) {
@@ -572,7 +571,8 @@ function loop(ts) {
       setTimeout(() => {
         cells = cells.filter(x => x.active || x.flashTimer > 0);
         while (cells.filter(x => x.active).length < MAX_CELLS) {
-          cells.push(spawnCell(player.x, player.y));
+          const e = Math.hypot(canvas.width / 2, canvas.height / 2) * 0.65;
+          cells.push(spawnCell(player.x, player.y, e, e + 150));
         }
         if (!committedCell || !committedCell.active) committedCell = nearestActiveCell();
       }, 650);
@@ -612,7 +612,7 @@ function loop(ts) {
     const baseBpmRate  = dt * (getBPM() / BASE_BPM);
     if (tcellAdaptKnownChord !== null && tcellAdaptKnownChord !== chordKey) tcellAdaptation = 0;
     tcellAdaptKnownChord = chordKey;
-    tcellAdaptation = Math.min(1, tcellAdaptation + baseBpmRate / 60 * (tcellEvading ? 3 : 1));
+    tcellAdaptation = Math.min(1, tcellAdaptation + baseBpmRate / 120 * (tcellEvading ? 3 : 1));
     if (bcellAdaptKnownChord !== null && bcellAdaptKnownChord !== chordKey) bcellAdaptation = 0;
     bcellAdaptKnownChord = chordKey;
     bcellAdaptation = Math.min(1, bcellAdaptation + baseBpmRate / 120 * (bcellFleeing ? 3 : 1));
@@ -779,7 +779,7 @@ function loop(ts) {
         && antibodies.filter(ab => !ab.attached).length < 2) {
       const noteIdx = Math.floor(Math.random() * 3);
       antibodies.push(new Antibody(bc.x, bc.y, noteIdx, ANTIBODY_FREQS[noteIdx]));
-      bc.launchTimer = bc.getSpawnInterval() * (0.85 + Math.random() * 0.3);
+      bc.launchTimer = (18 - bcellAdaptation * 14) * (0.85 + Math.random() * 0.3);
     }
     // Player can neutralise B-cell by matching a corner note
     if (Math.hypot(bc.x - player.x, bc.y - player.y) < bc.radius + player.radius) {
@@ -813,10 +813,13 @@ function loop(ts) {
     }
   }
 
-  // Cell leash: replace active cells that have drifted beyond 600 px from player
+  // Cell leash: replace active cells that are effectively too far away.
+  // Uses directional effective distance so behind-cells are recycled sooner when moving.
+  const leash = Math.hypot(canvas.width / 2, canvas.height / 2) * 2;
   cells = cells.map(c => {
-    if (!c.active || Math.hypot(c.x - player.x, c.y - player.y) <= 600) return c;
-    return spawnCell(player.x, player.y); // fresh random-type cell near player
+    if (!c.active || cellEffectiveDist(c) <= leash) return c;
+    const e = Math.hypot(canvas.width / 2, canvas.height / 2) * 0.65;
+    return spawnCell(player.x, player.y, e, e + 150);
   });
   if (!committedCell || !committedCell.active) committedCell = nearestActiveCell();
 
@@ -833,7 +836,7 @@ function loop(ts) {
   ctx.save();
   ctx.translate(canvas.width / 2 - player.x, canvas.height / 2 - player.y);
 
-  for (const bc of bcells) drawBCell(ctx, bc, bc.active ? bc.getActiveNote(player.x, player.y) : null);
+  for (const bc of bcells) drawBCell(ctx, bc, bc.active ? bc.getActiveNote(player.x, player.y) : null, bcellAdaptation);
   for (const c of cells) {
     if (!c.active && c.flashTimer <= 0) continue;
     const cActiveFreq = c.active ? c.getActiveNote(player.x, player.y) : null;
@@ -871,8 +874,9 @@ function loop(ts) {
   // Screen-space danger border: deep red throb when BPM is critical, neutrophil is latched, or player is in blast radius
   const bpmDanger    = Math.max(0, Math.min(1, 1 - (getBPM() - BASE_BPM) / BPM_DANGER_MARGIN));
   const latchDanger  = neutrophils.some(n => n.attachedToPlayer) ? 1 : 0;
+  const eatDanger  = macrophages.some(m => m.eatingPlayer) ? 1 : 0;
   const blastDanger  = blasts.some(b => !b.dead && Math.hypot(b.x - player.x, b.y - player.y) <= b.maxRadius) ? 1 : 0;
-  const dangerIntensity = Math.max(bpmDanger, latchDanger, blastDanger);
+  const dangerIntensity = Math.max(bpmDanger, latchDanger, blastDanger, eatDanger);
   drawDangerBorder(ctx, dangerIntensity, now);
 
   if (mutationHintTimer > 0) {
