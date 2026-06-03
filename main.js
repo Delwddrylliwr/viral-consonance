@@ -813,10 +813,11 @@ function loop(ts) {
     }
   }
 
-  // Cell leash: replace active cells that have drifted beyond twice the screen edge
+  // Cell leash: replace active cells that are effectively too far away.
+  // Uses directional effective distance so behind-cells are recycled sooner when moving.
   const leash = Math.hypot(canvas.width / 2, canvas.height / 2) * 2;
   cells = cells.map(c => {
-    if (!c.active || Math.hypot(c.x - player.x, c.y - player.y) <= leash) return c;
+    if (!c.active || cellEffectiveDist(c) <= leash) return c;
     const e = Math.hypot(canvas.width / 2, canvas.height / 2) * 0.65;
     return spawnCell(player.x, player.y, e, e + 150);
   });
@@ -873,8 +874,9 @@ function loop(ts) {
   // Screen-space danger border: deep red throb when BPM is critical, neutrophil is latched, or player is in blast radius
   const bpmDanger    = Math.max(0, Math.min(1, 1 - (getBPM() - BASE_BPM) / BPM_DANGER_MARGIN));
   const latchDanger  = neutrophils.some(n => n.attachedToPlayer) ? 1 : 0;
+  const eatDanger  = macrophages.some(m => m.eatingPlayer) ? 1 : 0;
   const blastDanger  = blasts.some(b => !b.dead && Math.hypot(b.x - player.x, b.y - player.y) <= b.maxRadius) ? 1 : 0;
-  const dangerIntensity = Math.max(bpmDanger, latchDanger, blastDanger);
+  const dangerIntensity = Math.max(bpmDanger, latchDanger, blastDanger, eatDanger);
   drawDangerBorder(ctx, dangerIntensity, now);
 
   if (mutationHintTimer > 0) {

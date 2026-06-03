@@ -268,7 +268,7 @@ export class Macrophage {
 
   update(dt, clones, beatPhase, player, playerDissonance, tcellAdaptation) {
     this.burstTimer = Math.max(0, this.burstTimer - dt);
-    const adaptedSpeed = this.speed * (1 + (tcellAdaptation || 0) * 0.8); // up to 1.8× at full adaptation
+    const adaptedSpeed = this.speed * (1 + (tcellAdaptation || 0)); // up to 2× at full adaptation
     const spd = this.burstTimer > 0 ? adaptedSpeed * 1.8 : adaptedSpeed;
     if (this.eatingPlayer && player) {
       this.x = player.x;
@@ -290,11 +290,11 @@ export class Macrophage {
     }
 
     this.retargetTimer -= dt;
-    if (this.retargetTimer <= 0) {
+    if (this.retargetTimer <= 0 || !this.target ) {
       const dissonance = playerDissonance || 0;
       const adaptation = tcellAdaptation || 0;
       // Probability of targeting player scales directly with player dissonance (complement + antibodies)
-      if (player && Math.random() < dissonance) {
+      if (player && Math.random() < dissonance + 0.5 * adaptation) {
         this.targetingPlayer = true;
         this.target = null;
       } else {
@@ -304,9 +304,9 @@ export class Macrophage {
           ? clones[Math.floor(Math.random() * clones.length)]
           : null;
       }
-      // Retarget interval: shrinks as T-cells adapt (3s → 0.5s); player dissonance speeds it up further
-      const baseInterval   = 3.0 - adaptation * 2.5;
-      const dissonanceBoost = 1 - dissonance * 0.7;
+      // Retarget interval: increases as T-cells adapt (3s → 0.5s); player dissonance slows it down further
+      const baseInterval   = adaptation * 3.0;
+      const dissonanceBoost = 0.5 + dissonance * 0.5;
       this.retargetTimer = Math.max(0.3, baseInterval * dissonanceBoost + (Math.random() - 0.5) * 0.4);
     }
 
