@@ -78,7 +78,7 @@
       <div class="ek-item"><canvas data-entity="clone"    width="44" height="44"></canvas><span>virion<span class="ek-desc"> — make more of these</span></span></div>
       <div class="ek-item"><canvas data-entity="protein"  width="44" height="44"></canvas><span>complement<span class="ek-desc"> — twists your notes</span></span></div>
       <div class="ek-item"><canvas data-entity="tcell_green"    width="44" height="44"></canvas><span>T-cell<span class="ek-desc"> — orchestrates against you</span></span></div>
-      <div class="ek-item"><canvas data-entity="tcell_red"    width="44" height="44"></canvas><span>T-cell<span class="ek-desc"> — on alert against you!!!</span></span></div>
+      <div class="ek-item"><canvas data-entity="tcell_red"    width="44" height="44"></canvas><span>T-cell<span class="ek-desc"> — alert and adapted!!!</span></span></div>
       <div class="ek-item"><canvas data-entity="macrophage" width="44" height="44"></canvas><span>macrophage<span class="ek-desc"> — eats your virions</span></span></div>
       <div class="ek-item"><canvas data-entity="neutrophil" width="44" height="44"></canvas><span>neutrophil<span class="ek-desc"> — avoid their blast</span></span></div>
       <div class="ek-item"><canvas data-entity="antibody" width="44" height="44"></canvas><span>antibody<span class="ek-desc"> — makes you discordant</span></span></div>
@@ -216,6 +216,13 @@
         ctx.stroke();
         ctx.fillStyle = 'hsla(0, 90%, 45%, 0.22)';
         ctx.fill();
+        //Now the surrounding adaptation circle
+        ctx.globalAlpha = 0.75;
+        ctx.beginPath();
+        ctx.arc(0, 0, 1.6 * s, - Math.PI / 2, - Math.PI / 2 + 0.95 * Math.PI * 2);
+        ctx.strokeStyle = `hsl(0, 100%, 60%)`;
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
         ctx.restore();
       }
 
