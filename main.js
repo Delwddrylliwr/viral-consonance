@@ -706,7 +706,7 @@ function loop(ts) {
   neutrophils = neutrophils.filter(n => !n.dead);
   nphilSpawnTimer = Math.max(0, nphilSpawnTimer - dt);
   const nphilMaxCount      = Math.floor(tcellAdaptation * 4) + 1;          // 1 → 5 as T-cells adapt
-  const nphilSpawnInterval = Math.max(3, 20 - bcellAdaptation * 17);      // 20s → 3s as B-cells adapt
+  const nphilSpawnInterval = Math.max(2, 20 - bcellAdaptation * 18);      // 20s → 3s as B-cells adapt
   if (neutrophils.length < nphilMaxCount && clones.length > 0 && nphilSpawnTimer <= 0) {
     neutrophils.push(new Neutrophil(...randomEdgePos()));
     nphilSpawnTimer = nphilSpawnInterval;
