@@ -1,5 +1,6 @@
 import { PLAYER_CHORD } from '../audio/scale.js';
 import { state } from '../game/state.js';
+import { roughness, DEFAULT_TIMBRE } from '../audio/consonance.js';
 
 // Dissonant substitutes for player chord notes [C4, E4, G4]:
 // half-step neighbours to maximise roughness when attached.
@@ -13,6 +14,15 @@ const CELL_DEFS = [
   { motif: [261.63, 329.63, 392.00, 523.25], color: '#f84', rotPeriod: 2.4 },
   { motif: [196.00, 293.66, 392.00, 587.33], color: '#5cf', rotPeriod: 2.4 },
   { motif: [277.18, 349.23, 415.30, 554.37], color: '#c47', rotPeriod: 2.4 },
+];
+
+// Rival virus strains introduced progressively. Each has a distinct hexatonic motif and colour.
+// Motifs chosen to interact differently with cells and player chord.
+export const RIVAL_DEFS = [
+  { id: 0, motif: [174.61, 196.00, 207.65, 261.63, 311.13, 349.23], color: '#e63' }, // F natural minor
+  { id: 1, motif: [233.08, 261.63, 293.66, 349.23, 392.00, 466.16], color: '#f90' }, // Bb major
+  { id: 2, motif: [185.00, 220.00, 246.94, 311.13, 370.00, 440.00], color: '#4df' }, // F# minor pent
+  { id: 3, motif: [155.56, 185.00, 233.08, 277.18, 311.13, 370.00], color: '#b4f' }, // Eb minor
 ];
 const CELL_DRIFT = 18; // px/s gentle background drift
 
@@ -313,14 +323,16 @@ export class Bacterium {
   }
 }
 
-// Competing virus strain. Infects cells independently; rival clones distract macrophages.
+// Competing virus strain. Hunts cells consonance-first; rival clones distract macrophages.
 // Player can contest infections during a 5 s window to cancel them.
 export class RivalVirus {
-  constructor(x, y) {
+  constructor(x, y, strainDef = RIVAL_DEFS[0]) {
     this.x = x; this.y = y;
     this.radius = 22;
-    this.motif  = [174.61, 196.00, 207.65, 261.63, 311.13, 349.23]; // F3, G3, Ab3, C4, Eb4, F4
-    this.color  = '#e63';
+    this.strainDef = strainDef;
+    this.motif    = strainDef.motif;
+    this.color    = strainDef.color;
+    this.strainId = strainDef.id;
     this.rotation      = Math.random() * Math.PI * 2;
     this.rotationSpeed = (2 * Math.PI) / 3.5;
     this.baseSpeed = 18 + Math.random() * 8;
@@ -328,12 +340,24 @@ export class RivalVirus {
     this.vx = Math.cos(dir) * this.baseSpeed;
     this.vy = Math.sin(dir) * this.baseSpeed;
     this.steerTimer  = 3 + Math.random() * 3;
-    this.infectTimer = 2 + Math.random() * 3; // short cooldown before first seek
+    this.infectTimer = 2 + Math.random() * 3;
+    this.scanTimer   = 0;
+    this._targetCell = null;
     this.infectingCell      = null;
     this.infectionCompleted = false;
     this._lastInfectedX = 0;
     this._lastInfectedY = 0;
     this.alive = true;
+  }
+
+  getActiveNote(tx, ty) {
+    const toward = Math.atan2(ty - this.y, tx - this.x);
+    let best = null, bestDiff = Infinity;
+    for (const dot of this.getDots()) {
+      const diff = Math.abs(angleDiff(dot.angle, toward));
+      if (diff < bestDiff) { bestDiff = diff; best = dot; }
+    }
+    return best.freq;
   }
 
   update(dt, cells, alertLevel = 0, rivalActivity = 0) {
@@ -342,11 +366,12 @@ export class RivalVirus {
 
     const speed = this.baseSpeed * (1 + alertLevel * 0.4);
 
-    // Advance active infection; rival drifts slowly while waiting
+    // Advance active infection; orbit the cell while waiting
     if (this.infectingCell) {
       if (!this.infectingCell.active || this.infectingCell.infectingRival !== this) {
         this.infectingCell = null;
         this.infectTimer   = 3 + Math.random() * 3;
+        this._targetCell   = null;
       } else {
         this.infectingCell.rivalProgress += dt / 5;
         if (this.infectingCell.rivalProgress >= 1) {
@@ -357,27 +382,46 @@ export class RivalVirus {
           this.infectingCell.active         = false;
           this.infectingCell                = null;
           this.infectionCompleted           = true;
+          this._targetCell                  = null;
           const activityFactor = Math.min(1, rivalActivity / 5);
           this.infectTimer     = Math.max(3, 8 - activityFactor * 5);
         }
       }
-      const mag = Math.hypot(this.vx, this.vy) || 1;
-      this.x += (this.vx / mag) * speed * 0.3 * dt;
-      this.y += (this.vy / mag) * speed * 0.3 * dt;
+      if (this.infectingCell) {
+        const dx = this.infectingCell.x - this.x, dy = this.infectingCell.y - this.y;
+        const d  = Math.hypot(dx, dy) || 1;
+        const orbitR = this.radius + 45 + 5;
+        if (d > orbitR * 1.3) {
+          this.x += (dx / d) * speed * dt;
+          this.y += (dy / d) * speed * dt;
+        } else {
+          const perp = { x: -dy / d, y: dx / d };
+          const radial = (d - orbitR) / orbitR;
+          this.x += (perp.x * speed + dx / d * speed * 0.3 * radial) * dt;
+          this.y += (perp.y * speed + dy / d * speed * 0.3 * radial) * dt;
+        }
+      }
       return;
     }
 
-    // Home toward nearest available cell; wander only when none exists
-    const targetCell = cells.reduce((best, c) => {
-      if (!c.active || c.infectingRival) return best;
-      const d = Math.hypot(c.x - this.x, c.y - this.y);
-      return !best || d < best.d ? { c, d } : best;
-    }, null);
+    // Periodic consonance scan: find the most consonant available cell
+    this.scanTimer -= dt;
+    if (this.scanTimer <= 0) {
+      this.scanTimer = 1.0 + Math.random() * 0.5;
+      let bestCell = null, bestScore = Infinity;
+      for (const c of cells) {
+        if (!c.active || c.infectingRival) continue;
+        const myNote   = this.getActiveNote(c.x, c.y);
+        const cellNote = c.getActiveNote(this.x, this.y);
+        const r = roughness([myNote], [cellNote], DEFAULT_TIMBRE);
+        if (r < bestScore) { bestScore = r; bestCell = c; }
+      }
+      this._targetCell = (bestCell && bestScore < 0.75) ? bestCell : null;
+    }
 
-    if (targetCell) {
-      const dx = targetCell.c.x - this.x, dy = targetCell.c.y - this.y;
-      const d  = targetCell.d || 1;
-      // Lateral jitter when close so approach looks organic
+    if (this._targetCell && this._targetCell.active && !this._targetCell.infectingRival) {
+      const dx = this._targetCell.x - this.x, dy = this._targetCell.y - this.y;
+      const d  = Math.hypot(dx, dy) || 1;
       const jitter = d < 280 ? Math.sin(Date.now() / 900 + this.rotation) * 18 : 0;
       const perp   = { x: -dy / d, y: dx / d };
       this.x += ((dx / d) * speed + perp.x * jitter) * dt;
@@ -387,12 +431,13 @@ export class RivalVirus {
 
       this.infectTimer -= dt;
       if (this.infectTimer <= 0 && d < this.radius + 45 + 8) {
-        this.infectingCell           = targetCell.c;
-        targetCell.c.infectingRival  = this;
-        targetCell.c.rivalProgress   = 0;
-        this.infectTimer             = 999;
+        this.infectingCell              = this._targetCell;
+        this._targetCell.infectingRival = this;
+        this._targetCell.rivalProgress  = 0;
+        this.infectTimer                = 999;
       }
     } else {
+      this._targetCell = null;
       this.steerTimer -= dt;
       if (this.steerTimer <= 0) {
         this.steerTimer = 3 + Math.random() * 4;
@@ -417,9 +462,11 @@ export class RivalVirus {
 // Small drifting entity produced by a completed rival infection.
 // Distracts macrophages; disappears after 35 s or when eaten.
 export class RivalClone {
-  constructor(x, y) {
+  constructor(x, y, strainId = 0, color = '#e63') {
     this.x = x; this.y = y;
     this.radius = 10;
+    this.strainId = strainId;
+    this.color = color;
     this.age    = 0;
     const dir = Math.random() * Math.PI * 2;
     const spd = 10 + Math.random() * 5;
@@ -466,7 +513,7 @@ export class Macrophage {
     this.rallyPoint      = null; // {x,y} — rush here before resuming normal behaviour
   }
 
-  update(dt, clones, beatPhase, player, playerDissonance, tcellAdaptation, distractibles = []) {
+  update(dt, clones, beatPhase, player, playerDissonance, tcellAdaptation, rivalClonePool = [], bacteria = []) {
     this.burstTimer = Math.max(0, this.burstTimer - dt);
     const adaptedSpeed = this.speed * (1 + (tcellAdaptation || 0)); // up to 2× at full adaptation
     const spd = this.burstTimer > 0 ? adaptedSpeed * 1.8 : adaptedSpeed;
@@ -500,13 +547,24 @@ export class Macrophage {
         this.distractedTarget = null;
       } else {
         this.targetingPlayer = false;
-        this.target = clones.length > 0
-          ? clones[Math.floor(Math.random() * clones.length)]
-          : null;
         this.distractedTarget = null;
-        // If no clone to hunt, consider wandering toward a distractible (bacterium / rival clone)
-        if (!this.target && distractibles.length > 0) {
-          const nearby = distractibles.filter(d => Math.hypot(d.x - this.x, d.y - this.y) < 280);
+        // Proportional split: macrophage attention mirrors clone population balance
+        const totalClones = clones.length + rivalClonePool.length;
+        if (totalClones > 0) {
+          const rivalShare = rivalClonePool.length / totalClones;
+          if (rivalClonePool.length > 0 && Math.random() < rivalShare) {
+            this.target = rivalClonePool[Math.floor(Math.random() * rivalClonePool.length)];
+          } else if (clones.length > 0) {
+            this.target = clones[Math.floor(Math.random() * clones.length)];
+          } else {
+            this.target = null;
+          }
+        } else {
+          this.target = null;
+        }
+        // If no clone target, consider wandering toward a bacterium
+        if (!this.target && bacteria.length > 0) {
+          const nearby = bacteria.filter(b => b.active && Math.hypot(b.x - this.x, b.y - this.y) < 280);
           if (nearby.length > 0 && Math.random() < 0.25) {
             const pick = nearby[Math.floor(Math.random() * nearby.length)];
             this.target           = pick;
@@ -528,7 +586,7 @@ export class Macrophage {
       const perp       = { x: -dy / d, y: dx / d };
       this.x += (dx / d * spd + perp.x * lateralAmt) * dt;
       this.y += (dy / d * spd + perp.y * lateralAmt) * dt;
-    } else if (this.target && clones.includes(this.target)) {
+    } else if (this.target && (clones.includes(this.target) || rivalClonePool.includes(this.target))) {
       const dx = this.target.x - this.x;
       const dy = this.target.y - this.y;
       const d  = Math.hypot(dx, dy) || 1;

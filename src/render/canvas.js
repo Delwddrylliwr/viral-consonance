@@ -181,7 +181,7 @@ export function drawRivalClone(ctx, rc) {
   ctx.globalAlpha = fade * 0.5;
   ctx.beginPath();
   ctx.arc(rc.x, rc.y, rc.radius, 0, Math.PI * 2);
-  ctx.fillStyle = '#e63';
+  ctx.fillStyle = rc.color;
   ctx.fill();
   ctx.restore();
 }
