@@ -327,10 +327,10 @@ export class RivalVirus {
     const dir = Math.random() * Math.PI * 2;
     this.vx = Math.cos(dir) * this.baseSpeed;
     this.vy = Math.sin(dir) * this.baseSpeed;
-    this.steerTimer  = 5 + Math.random() * 7;
-    this.infectTimer = 10 + Math.random() * 8;
+    this.steerTimer  = 3 + Math.random() * 3;
+    this.infectTimer = 2 + Math.random() * 3; // short cooldown before first seek
     this.infectingCell      = null;
-    this.infectionCompleted = false; // set true for one frame when an infection finishes
+    this.infectionCompleted = false;
     this._lastInfectedX = 0;
     this._lastInfectedY = 0;
     this.alive = true;
@@ -340,79 +340,69 @@ export class RivalVirus {
     this.rotation += this.rotationSpeed * dt;
     this.infectionCompleted = false;
 
-    // Opportunistic speed scaling: rival moves faster when immune is occupied with player
     const speed = this.baseSpeed * (1 + alertLevel * 0.4);
-    const dirMag = Math.hypot(this.vx, this.vy) || 1;
-    this.x += (this.vx / dirMag) * speed * dt;
-    this.y += (this.vy / dirMag) * speed * dt;
 
-    this.steerTimer -= dt;
-    if (this.steerTimer <= 0) {
-      this.steerTimer = 5 + Math.random() * 7;
-      const dir = Math.random() * Math.PI * 2;
-      this.vx = Math.cos(dir) * this.baseSpeed;
-      this.vy = Math.sin(dir) * this.baseSpeed;
-    }
-
-    // Weak pull toward nearest uninfected cell to ensure rival reaches action area
-    if (!this.infectingCell && cells.length > 0) {
-      const nearest = cells.reduce((best, c) => {
-        if (!c.active || c.infectingRival) return best;
-        const d = Math.hypot(c.x - this.x, c.y - this.y);
-        return !best || d < best.d ? { c, d } : best;
-      }, null);
-      if (nearest && nearest.d > 180) {
-        const pullX = nearest.c.x - this.x, pullY = nearest.c.y - this.y;
-        const pMag  = Math.hypot(pullX, pullY) || 1;
-        // Blend 20% toward nearest cell into current direction
-        this.vx = this.vx * 0.8 + (pullX / pMag) * this.baseSpeed * 0.2;
-        this.vy = this.vy * 0.8 + (pullY / pMag) * this.baseSpeed * 0.2;
-        const nm = Math.hypot(this.vx, this.vy) || 1;
-        this.vx = (this.vx / nm) * this.baseSpeed;
-        this.vy = (this.vy / nm) * this.baseSpeed;
-      }
-    }
-
-    // Advance current cell infection
+    // Advance active infection; rival drifts slowly while waiting
     if (this.infectingCell) {
       if (!this.infectingCell.active || this.infectingCell.infectingRival !== this) {
-        // Player contested or cell deactivated — infection cancelled
         this.infectingCell = null;
-        this.infectTimer   = 6 + Math.random() * 6;
+        this.infectTimer   = 3 + Math.random() * 3;
       } else {
         this.infectingCell.rivalProgress += dt / 5;
         if (this.infectingCell.rivalProgress >= 1) {
-          this._lastInfectedX = this.infectingCell.x;
-          this._lastInfectedY = this.infectingCell.y;
+          this._lastInfectedX               = this.infectingCell.x;
+          this._lastInfectedY               = this.infectingCell.y;
           this.infectingCell.rivalProgress  = 0;
           this.infectingCell.infectingRival = null;
-          this.infectingCell.active         = false; // consume the cell
+          this.infectingCell.active         = false;
           this.infectingCell                = null;
           this.infectionCompleted           = true;
-          // Infection rate accelerates as rival clones accumulate
           const activityFactor = Math.min(1, rivalActivity / 5);
           this.infectTimer     = Math.max(3, 8 - activityFactor * 5);
         }
       }
+      const mag = Math.hypot(this.vx, this.vy) || 1;
+      this.x += (this.vx / mag) * speed * 0.3 * dt;
+      this.y += (this.vy / mag) * speed * 0.3 * dt;
       return;
     }
 
-    // Look for a new cell to infect
-    this.infectTimer -= dt;
-    if (this.infectTimer <= 0) {
-      const range = this.radius + 45 + 40;
-      const candidate = cells.find(c =>
-        c.active && !c.infectingRival &&
-        Math.hypot(c.x - this.x, c.y - this.y) < range,
-      );
-      if (candidate) {
-        this.infectingCell       = candidate;
-        candidate.infectingRival = this;
-        candidate.rivalProgress  = 0;
+    // Home toward nearest available cell; wander only when none exists
+    const targetCell = cells.reduce((best, c) => {
+      if (!c.active || c.infectingRival) return best;
+      const d = Math.hypot(c.x - this.x, c.y - this.y);
+      return !best || d < best.d ? { c, d } : best;
+    }, null);
+
+    if (targetCell) {
+      const dx = targetCell.c.x - this.x, dy = targetCell.c.y - this.y;
+      const d  = targetCell.d || 1;
+      // Lateral jitter when close so approach looks organic
+      const jitter = d < 280 ? Math.sin(Date.now() / 900 + this.rotation) * 18 : 0;
+      const perp   = { x: -dy / d, y: dx / d };
+      this.x += ((dx / d) * speed + perp.x * jitter) * dt;
+      this.y += ((dy / d) * speed + perp.y * jitter) * dt;
+      this.vx = (dx / d) * this.baseSpeed;
+      this.vy = (dy / d) * this.baseSpeed;
+
+      this.infectTimer -= dt;
+      if (this.infectTimer <= 0 && d < this.radius + 45 + 8) {
+        this.infectingCell           = targetCell.c;
+        targetCell.c.infectingRival  = this;
+        targetCell.c.rivalProgress   = 0;
+        this.infectTimer             = 999;
       }
-      // Rearm — faster when immune is occupied
-      const base = Math.max(8, 18 - alertLevel * 10);
-      this.infectTimer = candidate ? 999 : base * (0.8 + Math.random() * 0.4);
+    } else {
+      this.steerTimer -= dt;
+      if (this.steerTimer <= 0) {
+        this.steerTimer = 3 + Math.random() * 4;
+        const dir = Math.random() * Math.PI * 2;
+        this.vx = Math.cos(dir) * this.baseSpeed;
+        this.vy = Math.sin(dir) * this.baseSpeed;
+      }
+      const mag = Math.hypot(this.vx, this.vy) || 1;
+      this.x += (this.vx / mag) * speed * dt;
+      this.y += (this.vy / mag) * speed * dt;
     }
   }
 
