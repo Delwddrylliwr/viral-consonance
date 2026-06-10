@@ -920,6 +920,15 @@ function loop(ts) {
         rv.update(dt, cells, immuneAlertLevel, strain.clones.length);
         if (rv.infectionCompleted) {
           strain.clones.push(new RivalClone(rv._lastInfectedX, rv._lastInfectedY, strain.def.id, strain.def.color));
+          setTimeout(() => {
+            cells = cells.filter(c => c.active || c.flashTimer > 0);
+            const needed = MAX_CELLS - cells.filter(c => c.active).length;
+            for (let i = 0; i < needed; i++) {
+              const e = Math.hypot(canvas.width / 2, canvas.height / 2) * 0.65;
+              cells.push(spawnCell(player.x, player.y, e, e + 150));
+            }
+            if (!committedCell || !committedCell.active) committedCell = nearestActiveCell();
+          }, 650);
         }
       }
       // Age out rival clones

@@ -377,6 +377,7 @@ export class RivalVirus {
         if (this.infectingCell.rivalProgress >= 1) {
           this._lastInfectedX               = this.infectingCell.x;
           this._lastInfectedY               = this.infectingCell.y;
+          this.infectingCell.flashTimer     = 0.5;
           this.infectingCell.rivalProgress  = 0;
           this.infectingCell.infectingRival = null;
           this.infectingCell.active         = false;
@@ -404,22 +405,25 @@ export class RivalVirus {
       return;
     }
 
-    // Periodic consonance scan: find the most consonant available cell
-    this.scanTimer -= dt;
-    if (this.scanTimer <= 0) {
-      this.scanTimer = 1.0 + Math.random() * 0.5;
-      let bestCell = null, bestScore = Infinity;
-      for (const c of cells) {
-        if (!c.active || c.infectingRival) continue;
-        const myNote   = this.getActiveNote(c.x, c.y);
-        const cellNote = c.getActiveNote(this.x, this.y);
-        const r = roughness([myNote], [cellNote], DEFAULT_TIMBRE);
-        if (r < bestScore) { bestScore = r; bestCell = c; }
+    // Scan for a new target only when we don't have a valid one — commit once selected
+    if (!this._targetCell || !this._targetCell.active || this._targetCell.infectingRival) {
+      this._targetCell = null;
+      this.scanTimer -= dt;
+      if (this.scanTimer <= 0) {
+        this.scanTimer = 1.0 + Math.random() * 0.5;
+        let bestCell = null, bestScore = Infinity;
+        for (const c of cells) {
+          if (!c.active || c.infectingRival) continue;
+          const myNote   = this.getActiveNote(c.x, c.y);
+          const cellNote = c.getActiveNote(this.x, this.y);
+          const r = roughness([myNote], [cellNote], DEFAULT_TIMBRE);
+          if (r < bestScore) { bestScore = r; bestCell = c; }
+        }
+        this._targetCell = bestCell;
       }
-      this._targetCell = bestCell; // always pursue most consonant; null only when no cells exist
     }
 
-    if (this._targetCell && this._targetCell.active && !this._targetCell.infectingRival) {
+    if (this._targetCell) {
       const dx = this._targetCell.x - this.x, dy = this._targetCell.y - this.y;
       const d  = Math.hypot(dx, dy) || 1;
       const jitter = d < 280 ? Math.sin(Date.now() / 900 + this.rotation) * 18 : 0;
@@ -437,7 +441,6 @@ export class RivalVirus {
         this.infectTimer                = 999;
       }
     } else {
-      this._targetCell = null;
       this.steerTimer -= dt;
       if (this.steerTimer <= 0) {
         this.steerTimer = 3 + Math.random() * 4;

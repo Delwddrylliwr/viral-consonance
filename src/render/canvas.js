@@ -431,6 +431,21 @@ export function drawTCell(ctx, tc, matchable = false, immuneAlert = 0, tcellAdap
     ? 'rgba(180, 80, 255, 0.18)'
     : `hsla(${hue}, ${sat}%, ${light}%, ${fillAlpha})`;
   ctx.fill();
+  // Interior player-virus replica — triangle grows more visible as T-cell adapts
+  if (tcellAdaptation > 0.05) {
+    const r = s * 0.48;
+    ctx.globalAlpha = tcellAdaptation * 0.6;
+    ctx.strokeStyle = `hsl(${hue}, 90%, 68%)`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2 - Math.PI / 2;
+      if (i === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+      else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  }
   ctx.restore();
 
   // T-cell adaptation arc — fills clockwise; colour shifts yellow-green → orange
