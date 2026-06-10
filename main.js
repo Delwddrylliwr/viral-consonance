@@ -893,9 +893,9 @@ function loop(ts) {
     }
   }
 
-  // Rival virus strains: new strain introduced every 60s while BPM is high enough
+  // Rival virus strains: new strain introduced every 60s while T Cells are distracted by you
   strainIntroTimer = Math.max(0, strainIntroTimer - dt);
-  if (strainIntroTimer <= 0 && nextStrainIdx < RIVAL_DEFS.length && gameTime >= 60 && getBPM() > 110) {
+  if (strainIntroTimer <= 0 && nextStrainIdx < RIVAL_DEFS.length && gameTime >= 60 && tcellAdaptation > 0.75) {
     const def = RIVAL_DEFS[nextStrainIdx++];
     rivalStrains.push({ def, viruses: [new RivalVirus(...randomEdgePos(), def)], clones: [], respawnTimer: 0 });
     strainIntroTimer = 60;
@@ -908,32 +908,27 @@ function loop(ts) {
       strain.viruses.push(new RivalVirus(...randomEdgePos(), strain.def));
     }
 
-    // Update viruses; handle infection completions and BPM-driven removal
-    if (getBPM() <= 80) {
-      strain.viruses = [];
-      strain.clones  = [];
-    } else {
-      for (const rv of strain.viruses) {
-        rv.update(dt, cells, immuneAlertLevel, strain.clones.length);
-        if (rv.infectionCompleted) {
-          // More viruses spawn when immune is focused on player and strain already has clones
-          if (immuneAlertLevel >= 0.5 && strain.clones.length >= 2) {
-            strain.viruses.push(new RivalVirus(...randomEdgePos(), strain.def));
-          } else {
-            // Spawn clones
-            strain.clones.push(new RivalClone(rv._lastInfectedX, rv._lastInfectedY, strain.def.id, strain.def.color));
-            strain.clones.push(new RivalClone(rv._lastInfectedX, rv._lastInfectedY, strain.def.id, strain.def.color));
-          }
-          setTimeout(() => {
-            cells = cells.filter(c => c.active || c.flashTimer > 0);
-            const needed = MAX_CELLS - cells.filter(c => c.active).length;
-            for (let i = 0; i < needed; i++) {
-              const e = Math.hypot(canvas.width / 2, canvas.height / 2) * 0.65;
-              cells.push(spawnCell(player.x, player.y, e, e + 150));
-            }
-            if (!committedCell || !committedCell.active) committedCell = nearestActiveCell();
-          }, 650);
+    // Update viruses; handle infection completions
+    for (const rv of strain.viruses) {
+      rv.update(dt, cells, immuneAlertLevel, strain.clones.length);
+      if (rv.infectionCompleted) {
+        // More viruses spawn when immune is focused on player and strain already has clones
+        if (immuneAlertLevel >= 0.1 && strain.clones.length >= 2) {
+          strain.viruses.push(new RivalVirus(rv._lastInfectedX, rv._lastInfectedY, strain.def));
+        } else {
+          // Spawn clones
+          strain.clones.push(new RivalClone(rv._lastInfectedX, rv._lastInfectedY, strain.def.id, strain.def.color));
+          strain.clones.push(new RivalClone(rv._lastInfectedX, rv._lastInfectedY, strain.def.id, strain.def.color));
         }
+        setTimeout(() => {
+          cells = cells.filter(c => c.active || c.flashTimer > 0);
+          const needed = MAX_CELLS - cells.filter(c => c.active).length;
+          for (let i = 0; i < needed; i++) {
+            const e = Math.hypot(canvas.width / 2, canvas.height / 2) * 0.65;
+            cells.push(spawnCell(player.x, player.y, e, e + 150));
+          }
+          if (!committedCell || !committedCell.active) committedCell = nearestActiveCell();
+        }, 650);
       }
       // Age out rival clones
       for (const rc of strain.clones) rc.update(dt);
