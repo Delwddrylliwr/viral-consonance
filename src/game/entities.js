@@ -335,7 +335,7 @@ export class RivalVirus {
     this.strainId = strainDef.id;
     this.rotation      = Math.random() * Math.PI * 2;
     this.rotationSpeed = (2 * Math.PI) / 3.5;
-    this.baseSpeed = 18 + Math.random() * 8;
+    this.baseSpeed = 45 + Math.random() * 20;
     const dir = Math.random() * Math.PI * 2;
     this.vx = Math.cos(dir) * this.baseSpeed;
     this.vy = Math.sin(dir) * this.baseSpeed;
@@ -416,7 +416,7 @@ export class RivalVirus {
         const r = roughness([myNote], [cellNote], DEFAULT_TIMBRE);
         if (r < bestScore) { bestScore = r; bestCell = c; }
       }
-      this._targetCell = (bestCell && bestScore < 0.75) ? bestCell : null;
+      this._targetCell = bestCell; // always pursue most consonant; null only when no cells exist
     }
 
     if (this._targetCell && this._targetCell.active && !this._targetCell.infectingRival) {
