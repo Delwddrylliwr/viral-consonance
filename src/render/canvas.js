@@ -179,10 +179,17 @@ export function drawRivalClone(ctx, rc) {
   const fade = Math.max(0, 1 - rc.age / 35);
   ctx.save();
   ctx.globalAlpha = fade * 0.5;
+  ctx.strokeStyle = rc.color;
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.arc(rc.x, rc.y, rc.radius, 0, Math.PI * 2);
-  ctx.fillStyle = rc.color;
-  ctx.fill();
+  for (let i = 0; i < 6; i++) {
+    const a = rc.angle + i * (Math.PI * 1 / 3);
+    const x = rc.x + Math.cos(a) * rc.radius;
+    const y = rc.y + Math.sin(a) * rc.radius;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.stroke();
   ctx.restore();
 }
 

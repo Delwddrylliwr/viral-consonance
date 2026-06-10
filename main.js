@@ -865,11 +865,12 @@ function loop(ts) {
   }
 
   // Bacteria: slow ecosystem drifters that distract macrophages and reward infection with 1 clone
-  const MAX_BACTERIA = 2;
+  const MAX_BACTERIA = 10;
   bacteriaSpawnTimer = Math.max(0, bacteriaSpawnTimer - dt);
   if (bacteria.length < MAX_BACTERIA && bacteriaSpawnTimer <= 0 && gameTime >= 30) {
     bacteria.push(spawnBacterium(player.x, player.y));
-    bacteriaSpawnTimer = 60;
+    // Spawn interval decreases with number of existing bacteria
+    bacteriaSpawnTimer = (60-3*bacteria.length)*Math.random();
   }
   for (const b of bacteria) b.update(dt);
   // Leash bacteria similarly to cells
@@ -906,10 +907,6 @@ function loop(ts) {
     if (strain.viruses.length === 0 && strain.clones.length > 0 && strain.respawnTimer <= 0) {
       strain.viruses.push(new RivalVirus(...randomEdgePos(), strain.def));
     }
-    // Second virus spawns when immune is focused on player and strain already has clones
-    if (strain.viruses.length === 1 && immuneAlertLevel >= 0.5 && strain.clones.length >= 2) {
-      strain.viruses.push(new RivalVirus(...randomEdgePos(), strain.def));
-    }
 
     // Update viruses; handle infection completions and BPM-driven removal
     if (getBPM() <= 80) {
@@ -919,7 +916,14 @@ function loop(ts) {
       for (const rv of strain.viruses) {
         rv.update(dt, cells, immuneAlertLevel, strain.clones.length);
         if (rv.infectionCompleted) {
-          strain.clones.push(new RivalClone(rv._lastInfectedX, rv._lastInfectedY, strain.def.id, strain.def.color));
+          // More viruses spawn when immune is focused on player and strain already has clones
+          if (immuneAlertLevel >= 0.5 && strain.clones.length >= 2) {
+            strain.viruses.push(new RivalVirus(...randomEdgePos(), strain.def));
+          } else {
+            // Spawn clones
+            strain.clones.push(new RivalClone(rv._lastInfectedX, rv._lastInfectedY, strain.def.id, strain.def.color));
+            strain.clones.push(new RivalClone(rv._lastInfectedX, rv._lastInfectedY, strain.def.id, strain.def.color));
+          }
           setTimeout(() => {
             cells = cells.filter(c => c.active || c.flashTimer > 0);
             const needed = MAX_CELLS - cells.filter(c => c.active).length;
@@ -933,7 +937,7 @@ function loop(ts) {
       }
       // Age out rival clones
       for (const rc of strain.clones) rc.update(dt);
-      strain.clones = strain.clones.filter(rc => rc.age < 35);
+      strain.clones = strain.clones.filter(rc => rc.age < 60);
     }
 
     // Gentle bounce on player contact — no alert escalation (both viruses)

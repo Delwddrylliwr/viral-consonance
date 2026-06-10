@@ -335,7 +335,7 @@ export class RivalVirus {
     this.strainId = strainDef.id;
     this.rotation      = Math.random() * Math.PI * 2;
     this.rotationSpeed = (2 * Math.PI) / 3.5;
-    this.baseSpeed = 45 + Math.random() * 20;
+    this.baseSpeed = 75 + Math.random() * 25;
     const dir = Math.random() * Math.PI * 2;
     this.vx = Math.cos(dir) * this.baseSpeed;
     this.vy = Math.sin(dir) * this.baseSpeed;
@@ -467,6 +467,7 @@ export class RivalVirus {
 export class RivalClone {
   constructor(x, y, strainId = 0, color = '#e63') {
     this.x = x; this.y = y;
+    this.angle = 0;
     this.radius = 10;
     this.strainId = strainId;
     this.color = color;
@@ -480,6 +481,7 @@ export class RivalClone {
 
   update(dt) {
     this.age += dt;
+    this.angle += 0.4 * dt;
     this.x += this.vx * dt;
     this.y += this.vy * dt;
     this.steerTimer -= dt;
