@@ -1,4 +1,4 @@
-import { Cell, ComplementProtein } from './entities.js';
+import { Cell, ComplementProtein, Bacterium } from './entities.js';
 
 export const INFECTION_THRESHOLD = 0.3;
 
@@ -57,6 +57,15 @@ export function spawnProtein(playerX, playerY) {
   const angle = Math.random() * Math.PI * 2;
   const dist  = 280 + Math.random() * 120; // 280–400 px from player
   return new ComplementProtein(
+    playerX + Math.cos(angle) * dist,
+    playerY + Math.sin(angle) * dist,
+  );
+}
+
+export function spawnBacterium(playerX, playerY) {
+  const angle = Math.random() * Math.PI * 2;
+  const dist  = 320 + Math.random() * 180; // 320–500 px from player
+  return new Bacterium(
     playerX + Math.cos(angle) * dist,
     playerY + Math.sin(angle) * dist,
   );
