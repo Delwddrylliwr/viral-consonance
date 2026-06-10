@@ -76,6 +76,19 @@ export function drawCell(ctx, cell, activeFreq = null, baseAlpha = 0.6) {
 
   drawCircle(ctx, cell.x, cell.y, cell.radius, color, alpha);
 
+  // Rival infection progress: tint grows from nothing to a solid orange-red arc
+  if (cell.rivalProgress > 0) {
+    ctx.save();
+    ctx.globalAlpha = Math.min(0.55, cell.rivalProgress * 0.7);
+    ctx.beginPath();
+    ctx.arc(cell.x, cell.y, cell.radius - 3, -Math.PI / 2,
+            -Math.PI / 2 + cell.rivalProgress * Math.PI * 2);
+    ctx.strokeStyle = '#e63';
+    ctx.lineWidth   = 4;
+    ctx.stroke();
+    ctx.restore();
+  }
+
   for (const dot of cell.getDots()) {
     const isActive = activeFreq !== null && dot.freq === activeFreq;
     ctx.save();
@@ -87,6 +100,97 @@ export function drawCell(ctx, cell, activeFreq = null, baseAlpha = 0.6) {
     ctx.fillText(noteLabel(dot.freq), dot.x, dot.y);
     ctx.restore();
   }
+}
+
+// Rod-shaped bacterium with elliptical body and metabolic pulse ring
+export function drawBacterium(ctx, bact) {
+  const alpha = bact.flashTimer > 0 ? 0.5 + 0.5 * (bact.flashTimer / 0.5) : 0.55;
+  const color = bact.flashTimer > 0 ? '#fff' : bact.color;
+
+  // Metabolic pulse — faint expanding ring
+  if (bact.metabolicPulse) {
+    const { r, maxR } = bact.metabolicPulse;
+    ctx.save();
+    ctx.globalAlpha = 0.35 * (1 - r / maxR);
+    ctx.beginPath();
+    ctx.arc(bact.x, bact.y, r, 0, Math.PI * 2);
+    ctx.strokeStyle = color;
+    ctx.lineWidth   = 1;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Elliptical body
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(bact.x, bact.y);
+  ctx.rotate(bact.rotation);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, bact.radius * 1.3, bact.radius * 0.7, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = color;
+  ctx.lineWidth   = 1.5;
+  ctx.stroke();
+  ctx.restore();
+
+  // Note dots at ellipse positions
+  for (const dot of bact.getDots()) {
+    ctx.save();
+    ctx.globalAlpha  = alpha * 0.85;
+    ctx.font         = 'bold 11px sans-serif';
+    ctx.fillStyle    = color;
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(noteLabel(dot.freq), dot.x, dot.y);
+    ctx.restore();
+  }
+}
+
+// Hexagonal rival virus with 6-note motif
+export function drawRivalVirus(ctx, rv) {
+  const dots = rv.getDots();
+
+  ctx.save();
+  ctx.globalAlpha = 0.65;
+  ctx.beginPath();
+  dots.forEach((d, i) => i === 0 ? ctx.moveTo(d.x, d.y) : ctx.lineTo(d.x, d.y));
+  ctx.closePath();
+  ctx.strokeStyle = rv.color;
+  ctx.lineWidth   = 1.5;
+  ctx.stroke();
+  ctx.fillStyle   = rv.color;
+  ctx.globalAlpha = 0.07;
+  ctx.fill();
+  ctx.restore();
+
+  for (const dot of dots) {
+    ctx.save();
+    ctx.globalAlpha  = 0.6;
+    ctx.font         = 'bold 10px sans-serif';
+    ctx.fillStyle    = rv.color;
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(noteLabel(dot.freq), dot.x, dot.y);
+    ctx.restore();
+  }
+}
+
+// Tiny drifting dot — product of a completed rival infection
+export function drawRivalClone(ctx, rc) {
+  const fade = Math.max(0, 1 - rc.age / 35);
+  ctx.save();
+  ctx.globalAlpha = fade * 0.5;
+  ctx.strokeStyle = rc.color;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = rc.angle + i * (Math.PI * 1 / 3);
+    const x = rc.x + Math.cos(a) * rc.radius;
+    const y = rc.y + Math.sin(a) * rc.radius;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.stroke();
+  ctx.restore();
 }
 
 // Returns the point where a ray from (cx,cy) in direction (nx,ny) exits a convex polygon.
@@ -334,6 +438,21 @@ export function drawTCell(ctx, tc, matchable = false, immuneAlert = 0, tcellAdap
     ? 'rgba(180, 80, 255, 0.18)'
     : `hsla(${hue}, ${sat}%, ${light}%, ${fillAlpha})`;
   ctx.fill();
+  // Interior player-virus replica — triangle grows more visible as T-cell adapts
+  if (tcellAdaptation > 0.05) {
+    const r = s * 0.48;
+    ctx.globalAlpha = tcellAdaptation * 0.6;
+    ctx.strokeStyle = `hsl(${hue}, 90%, 68%)`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2 - Math.PI / 2;
+      if (i === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+      else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  }
   ctx.restore();
 
   // T-cell adaptation arc — fills clockwise; colour shifts yellow-green → orange

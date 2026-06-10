@@ -1,6 +1,7 @@
 import { initCanvas, clear, drawPlayer, drawCell, drawGlow, drawInfectionFlash, drawProtein, drawClone,
          drawMacrophage, drawTCell, drawAntibody, drawNeutrophil, drawLetterBond, drawBCell,
-         drawNeutrophilBlast, drawDangerBorder } from './src/render/canvas.js';
+         drawNeutrophilBlast, drawDangerBorder,
+         drawBacterium, drawRivalVirus, drawRivalClone } from './src/render/canvas.js';
 import { state } from './src/game/state.js';
 import { startTransport, onBeat, getBPM, setTempo } from './src/audio/transport.js';
 import { createPlayerVoice, createCellVoice, createCloneVoice, voiceCount,
@@ -11,9 +12,10 @@ import { createPlayerVoice, createCellVoice, createCloneVoice, voiceCount,
   from './src/audio/synthesis.js';
 import { roughness, DEFAULT_TIMBRE } from './src/audio/consonance.js';
 import { PLAYER_CHORD } from './src/audio/scale.js';
-import { Player, Cell, Clone, Macrophage, TCell, Antibody, Neutrophil, BCell, NeutrophilBlast, angleDiff } from './src/game/entities.js';
+import { Player, Cell, Clone, Macrophage, TCell, Antibody, Neutrophil, BCell, NeutrophilBlast, angleDiff,
+         Bacterium, RivalVirus, RivalClone, RIVAL_DEFS } from './src/game/entities.js';
 import { checkContact, bouncePlayer, spawnCell, INFECTION_THRESHOLD,
-         checkContactProtein, spawnProtein }
+         checkContactProtein, spawnProtein, spawnBacterium }
   from './src/game/contact.js';
 
 const canvas = initCanvas();
@@ -85,6 +87,10 @@ const BLAST_DISSONANCE_THRESH  = 0.05; // player roughness above which blast is 
 
 let player, cells, committedCell, proteins, clones, playerVoice, cellVoice, cloneVoice;
 let macrophages, tcells, antibodies, neutrophils, bcells, blasts;
+let bacteria, bacteriaSpawnTimer;
+let rivalStrains;     // Array of { def, viruses: RivalVirus[], clones: RivalClone[], respawnTimer }
+let strainIntroTimer; // countdown to next strain introduction
+let nextStrainIdx;    // which RIVAL_DEFS entry to introduce next
 let antibodySpawnTimer  = 15;
 let tcellRespawnTimer   = 0;
 let immuneAlertLevel = 0;
@@ -252,6 +258,11 @@ function init() {
   neutrophils        = [];
   bcells             = [];
   blasts             = [];
+  bacteria           = [];
+  bacteriaSpawnTimer = 30;
+  rivalStrains       = [];
+  strainIntroTimer   = 60;
+  nextStrainIdx      = 0;
   antibodySpawnTimer   = 15;
   tcellRespawnTimer    = 0;
   immuneAlertLevel     = 0;
@@ -542,6 +553,13 @@ function loop(ts) {
     const cNote = c.getActiveNote(player.x, player.y);
     const r     = roughness([pNote], [cNote], DEFAULT_TIMBRE);
     if (r < INFECTION_THRESHOLD) {
+      // If rival was infecting this cell, cancel it — player takes over the replication site
+      if (c.infectingRival) {
+        c.infectingRival.infectingCell = null;
+        c.infectingRival.infectTimer   = 4 + Math.random() * 4;
+        c.infectingRival  = null;
+        c.rivalProgress   = 0;
+      }
       c.active = false;
       c.flashTimer = 0.5;
       infectionFlash = 1;
@@ -603,6 +621,9 @@ function loop(ts) {
   const attachmentDissonance  = Math.min(1,
     (attachedProteinCount + attachedAntibodyCount) / 3 + bounceTargetTimer * 0.5);
 
+  // Flat array of all rival clones across strains — used for macrophage targeting and T-cell pause
+  const allRivalClones = rivalStrains.flatMap(s => s.clones);
+
   // T-cell and B-cell adaptation: grow proportional to BPM, reset when player chord mutates;
   // evasion (player proximity) accelerates each cell type's own adaptation independently
   {
@@ -610,9 +631,11 @@ function loop(ts) {
     const tcellEvading = tcells.some(tc => tc.isEvading);
     const bcellFleeing = bcells.some(bc => Math.hypot(bc.x - player.x, bc.y - player.y) < 300);
     const baseBpmRate  = dt * (getBPM() / BASE_BPM);
+    // T-cell adaptation toward player pauses when rival clones outnumber player clones
+    const tcellRivalPause = allRivalClones.length > clones.length;
     if (tcellAdaptKnownChord !== null && tcellAdaptKnownChord !== chordKey) tcellAdaptation = 0;
     tcellAdaptKnownChord = chordKey;
-    tcellAdaptation = Math.min(1, tcellAdaptation + baseBpmRate / 120 * (tcellEvading ? 3 : 1));
+    tcellAdaptation = Math.min(1, tcellAdaptation + baseBpmRate / 120 * (tcellEvading ? 3 : 1) * (tcellRivalPause ? 0 : 1));
     if (bcellAdaptKnownChord !== null && bcellAdaptKnownChord !== chordKey) bcellAdaptation = 0;
     bcellAdaptKnownChord = chordKey;
     bcellAdaptation = Math.min(1, bcellAdaptation + baseBpmRate / 120 * (bcellFleeing ? 3 : 1));
@@ -669,7 +692,8 @@ function loop(ts) {
   if (macrophages.length > MACROPHAGE_MAX) macrophages.length = MACROPHAGE_MAX;
 
   for (const m of macrophages) {
-    m.update(dt, clones, beatPhase, player, attachmentDissonance, tcellAdaptation);
+    m.update(dt, clones, beatPhase, player, attachmentDissonance, tcellAdaptation,
+             allRivalClones, bacteria.filter(b => b.active));
 
     // Macrophage eats player: contact starts a 2s eat window; shake to escape
     if (m.targetingPlayer && !m.eatingPlayer
@@ -699,6 +723,33 @@ function loop(ts) {
           break;
         }
       }
+      // Macrophage can consume rival clones across all strains
+      outerRC: for (const strain of rivalStrains) {
+        for (let i = strain.clones.length - 1; i >= 0; i--) {
+          const rc = strain.clones[i];
+          if (Math.hypot(m.x - rc.x, m.y - rc.y) < m.radius + rc.radius) {
+            strain.clones.splice(i, 1);
+            m.target = null; m.retargetTimer = 0;
+            break outerRC;
+          }
+        }
+      }
+      // Macrophage can eat rival viruses across all strains
+      outerRV: for (const strain of rivalStrains) {
+        for (let i = strain.viruses.length - 1; i >= 0; i--) {
+          const rv = strain.viruses[i];
+          if (Math.hypot(m.x - rv.x, m.y - rv.y) < m.radius + rv.radius) {
+            if (rv.infectingCell) {
+              rv.infectingCell.infectingRival = null;
+              rv.infectingCell.rivalProgress  = 0;
+            }
+            strain.viruses.splice(i, 1);
+            strain.respawnTimer = 45;
+            m.target = null; m.retargetTimer = 0;
+            break outerRV;
+          }
+        }
+      }
     }
   }
 
@@ -706,7 +757,7 @@ function loop(ts) {
   neutrophils = neutrophils.filter(n => !n.dead);
   nphilSpawnTimer = Math.max(0, nphilSpawnTimer - dt);
   const nphilMaxCount      = Math.floor(tcellAdaptation * 4) + 1;          // 1 → 5 as T-cells adapt
-  const nphilSpawnInterval = Math.max(3, 20 - bcellAdaptation * 17);      // 20s → 3s as B-cells adapt
+  const nphilSpawnInterval = Math.max(2, 20 - bcellAdaptation * 18);      // 20s → 3s as B-cells adapt
   if (neutrophils.length < nphilMaxCount && clones.length > 0 && nphilSpawnTimer <= 0) {
     neutrophils.push(new Neutrophil(...randomEdgePos()));
     nphilSpawnTimer = nphilSpawnInterval;
@@ -813,11 +864,96 @@ function loop(ts) {
     }
   }
 
+  // Bacteria: slow ecosystem drifters that distract macrophages and reward infection with 1 clone
+  const MAX_BACTERIA = 10;
+  bacteriaSpawnTimer = Math.max(0, bacteriaSpawnTimer - dt);
+  if (bacteria.length < MAX_BACTERIA && bacteriaSpawnTimer <= 0 && gameTime >= 30) {
+    bacteria.push(spawnBacterium(player.x, player.y));
+    // Spawn interval decreases with number of existing bacteria
+    bacteriaSpawnTimer = (60-3*bacteria.length)*Math.random();
+  }
+  for (const b of bacteria) b.update(dt);
+  // Leash bacteria similarly to cells
+  const bacteriaLeash = Math.hypot(canvas.width / 2, canvas.height / 2) * 2.2;
+  bacteria = bacteria.filter(b => b.active && Math.hypot(b.x - player.x, b.y - player.y) <= bacteriaLeash);
+  // Player infection of bacterium (lenient threshold): spawns exactly 1 clone
+  for (const b of bacteria) {
+    if (!b.active || !checkContact(player, b)) continue;
+    const pNote = player.getActiveNote(b.x, b.y);
+    const bNote = b.getActiveNote(player.x, player.y);
+    const r     = roughness([pNote], [bNote], DEFAULT_TIMBRE);
+    if (r < 0.35) {
+      b.active = false;
+      b.flashTimer = 0.5;
+      infectionFlash = 0.5;
+      resolutionCadence([pNote, bNote], player.chord);
+      clones.push(new Clone(b.x + (Math.random() - 0.5) * 40, b.y + (Math.random() - 0.5) * 40, player.chord));
+      setTempo(BASE_BPM + clones.length * BPM_PER_CLONE);
+      setMasterVolume(getBPM());
+    }
+  }
+
+  // Rival virus strains: new strain introduced every 60s while T Cells are distracted by you
+  strainIntroTimer = Math.max(0, strainIntroTimer - dt);
+  if (strainIntroTimer <= 0 && nextStrainIdx < RIVAL_DEFS.length && gameTime >= 60 && tcellAdaptation > 0.75) {
+    const def = RIVAL_DEFS[nextStrainIdx++];
+    rivalStrains.push({ def, viruses: [new RivalVirus(...randomEdgePos(), def)], clones: [], respawnTimer: 0 });
+    strainIntroTimer = 60;
+  }
+
+  for (const strain of rivalStrains) {
+    // Respawn virus if it was eaten but clones are still active
+    strain.respawnTimer = Math.max(0, strain.respawnTimer - dt);
+    if (strain.viruses.length === 0 && strain.clones.length > 0 && strain.respawnTimer <= 0) {
+      strain.viruses.push(new RivalVirus(...randomEdgePos(), strain.def));
+    }
+
+    // Update viruses; handle infection completions
+    for (const rv of strain.viruses) {
+      rv.update(dt, cells, immuneAlertLevel, strain.clones.length);
+      if (rv.infectionCompleted) {
+        // More viruses spawn when immune is focused on player and strain already has clones
+        if (immuneAlertLevel >= 0.1 && strain.clones.length >= 2) {
+          strain.viruses.push(new RivalVirus(rv._lastInfectedX, rv._lastInfectedY, strain.def));
+        } else {
+          // Spawn clones
+          strain.clones.push(new RivalClone(rv._lastInfectedX, rv._lastInfectedY, strain.def.id, strain.def.color));
+          strain.clones.push(new RivalClone(rv._lastInfectedX, rv._lastInfectedY, strain.def.id, strain.def.color));
+        }
+        setTimeout(() => {
+          cells = cells.filter(c => c.active || c.flashTimer > 0);
+          const needed = MAX_CELLS - cells.filter(c => c.active).length;
+          for (let i = 0; i < needed; i++) {
+            const e = Math.hypot(canvas.width / 2, canvas.height / 2) * 0.65;
+            cells.push(spawnCell(player.x, player.y, e, e + 150));
+          }
+          if (!committedCell || !committedCell.active) committedCell = nearestActiveCell();
+        }, 650);
+      }
+      // Age out rival clones
+      for (const rc of strain.clones) rc.update(dt);
+      strain.clones = strain.clones.filter(rc => rc.age < 60);
+    }
+
+    // Gentle bounce on player contact — no alert escalation (both viruses)
+    for (const rv of strain.viruses) {
+      if (Math.hypot(player.x - rv.x, player.y - rv.y) < player.radius + rv.radius) {
+        const dx = player.x - rv.x, dy = player.y - rv.y;
+        const d  = Math.hypot(dx, dy) || 1;
+        player.vx += (dx / d) * 40;
+        player.vy += (dy / d) * 40;
+      }
+    }
+  }
+  // Extinction: remove strains where all viruses and clones are gone and no respawn pending
+  rivalStrains = rivalStrains.filter(s => s.viruses.length > 0 || s.clones.length > 0 || s.respawnTimer > 0);
+
   // Cell leash: replace active cells that are effectively too far away.
   // Uses directional effective distance so behind-cells are recycled sooner when moving.
   const leash = Math.hypot(canvas.width / 2, canvas.height / 2) * 2;
   cells = cells.map(c => {
     if (!c.active || cellEffectiveDist(c) <= leash) return c;
+    if (c.infectingRival) { c.infectingRival.infectingCell = null; c.infectingRival.infectTimer = 5; }
     const e = Math.hypot(canvas.width / 2, canvas.height / 2) * 0.65;
     return spawnCell(player.x, player.y, e, e + 150);
   });
@@ -837,6 +973,11 @@ function loop(ts) {
   ctx.translate(canvas.width / 2 - player.x, canvas.height / 2 - player.y);
 
   for (const bc of bcells) drawBCell(ctx, bc, bc.active ? bc.getActiveNote(player.x, player.y) : null, bcellAdaptation);
+  for (const b of bacteria) if (b.active || b.flashTimer > 0) drawBacterium(ctx, b);
+  for (const strain of rivalStrains) {
+    for (const rv of strain.viruses) drawRivalVirus(ctx, rv);
+    for (const rc of strain.clones) drawRivalClone(ctx, rc);
+  }
   for (const c of cells) {
     if (!c.active && c.flashTimer <= 0) continue;
     const cActiveFreq = c.active ? c.getActiveNote(player.x, player.y) : null;

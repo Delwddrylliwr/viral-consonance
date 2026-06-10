@@ -1,5 +1,6 @@
 import { PLAYER_CHORD } from '../audio/scale.js';
 import { state } from '../game/state.js';
+import { roughness, DEFAULT_TIMBRE } from '../audio/consonance.js';
 
 // Dissonant substitutes for player chord notes [C4, E4, G4]:
 // half-step neighbours to maximise roughness when attached.
@@ -13,6 +14,15 @@ const CELL_DEFS = [
   { motif: [261.63, 329.63, 392.00, 523.25], color: '#f84', rotPeriod: 2.4 },
   { motif: [196.00, 293.66, 392.00, 587.33], color: '#5cf', rotPeriod: 2.4 },
   { motif: [277.18, 349.23, 415.30, 554.37], color: '#c47', rotPeriod: 2.4 },
+];
+
+// Rival virus strains introduced progressively. Each has a distinct hexatonic motif and colour.
+// Motifs chosen to interact differently with cells and player chord.
+export const RIVAL_DEFS = [
+  { id: 0, motif: [174.61, 196.00, 207.65, 261.63, 311.13, 349.23], color: '#e63' }, // F natural minor
+  { id: 1, motif: [233.08, 261.63, 293.66, 349.23, 392.00, 466.16], color: '#f90' }, // Bb major
+  { id: 2, motif: [185.00, 220.00, 246.94, 311.13, 370.00, 440.00], color: '#4df' }, // F# minor pent
+  { id: 3, motif: [155.56, 185.00, 233.08, 277.18, 311.13, 370.00], color: '#b4f' }, // Eb minor
 ];
 const CELL_DRIFT = 18; // px/s gentle background drift
 
@@ -103,6 +113,8 @@ export class Cell {
     const dAngle = Math.random() * Math.PI * 2;
     this.dx = Math.cos(dAngle) * CELL_DRIFT;
     this.dy = Math.sin(dAngle) * CELL_DRIFT;
+    this.rivalProgress  = 0;    // 0→1 as rival virus infects this cell
+    this.infectingRival = null; // reference to the RivalVirus currently infecting this cell
   }
 
   update(dt) {
@@ -244,6 +256,245 @@ export class Clone {
   }
 }
 
+// Slow-drifting commensal bacterium. Player can infect it (lenient threshold) for 1 clone.
+// Occasionally emits a metabolic pulse and distracts macrophages.
+export class Bacterium {
+  constructor(x, y) {
+    this.x = x; this.y = y;
+    this.radius = 36;
+    this.motif  = [146.83, 220.00, 261.63, 392.00]; // D3, A3, C4, G4
+    this.color  = '#2a9';
+    this.rotation      = Math.random() * Math.PI * 2;
+    this.rotationSpeed = (2 * Math.PI) / 5.0;
+    this.active     = true;
+    this.flashTimer = 0;
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 8 + Math.random() * 4;
+    this.dx = Math.cos(angle) * speed;
+    this.dy = Math.sin(angle) * speed;
+    this.steerTimer = 10 + Math.random() * 10;
+    this.pulseTimer = 25 + Math.random() * 15;
+    this.metabolicPulse = null; // { r, maxR } while active
+  }
+
+  update(dt) {
+    this.rotation += this.rotationSpeed * dt;
+    if (this.flashTimer > 0) this.flashTimer = Math.max(0, this.flashTimer - dt);
+    if (!this.active) return;
+    this.x += this.dx * dt;
+    this.y += this.dy * dt;
+    this.steerTimer -= dt;
+    if (this.steerTimer <= 0) {
+      this.steerTimer = 10 + Math.random() * 10;
+      const turn = (Math.random() - 0.5) * 0.8;
+      const c = Math.cos(turn), s = Math.sin(turn);
+      const nx = this.dx * c - this.dy * s;
+      const ny = this.dx * s + this.dy * c;
+      this.dx = nx; this.dy = ny;
+    }
+    this.pulseTimer -= dt;
+    if (this.pulseTimer <= 0) {
+      this.pulseTimer = 25 + Math.random() * 15;
+      this.metabolicPulse = { r: 0, maxR: 80 };
+    }
+    if (this.metabolicPulse) {
+      this.metabolicPulse.r += 60 * dt;
+      if (this.metabolicPulse.r >= this.metabolicPulse.maxR) this.metabolicPulse = null;
+    }
+  }
+
+  getDots() {
+    const rx = this.radius * 1.3;
+    const ry = this.radius * 0.7;
+    return this.motif.map((freq, i) => {
+      const angle = this.rotation + (i * Math.PI / 2);
+      return { x: this.x + Math.cos(angle) * rx, y: this.y + Math.sin(angle) * ry, freq, angle };
+    });
+  }
+
+  getActiveNote(px, py) {
+    const toward = Math.atan2(py - this.y, px - this.x);
+    let best = null, bestDiff = Infinity;
+    for (const dot of this.getDots()) {
+      const diff = Math.abs(angleDiff(dot.angle, toward));
+      if (diff < bestDiff) { bestDiff = diff; best = dot; }
+    }
+    return best.freq;
+  }
+}
+
+// Competing virus strain. Hunts cells consonance-first; rival clones distract macrophages.
+// Player can contest infections during a 5 s window to cancel them.
+export class RivalVirus {
+  constructor(x, y, strainDef = RIVAL_DEFS[0]) {
+    this.x = x; this.y = y;
+    this.radius = 22;
+    this.strainDef = strainDef;
+    this.motif    = strainDef.motif;
+    this.color    = strainDef.color;
+    this.strainId = strainDef.id;
+    this.rotation      = Math.random() * Math.PI * 2;
+    this.rotationSpeed = (2 * Math.PI) / 3.5;
+    this.baseSpeed = 75 + Math.random() * 25;
+    const dir = Math.random() * Math.PI * 2;
+    this.vx = Math.cos(dir) * this.baseSpeed;
+    this.vy = Math.sin(dir) * this.baseSpeed;
+    this.steerTimer  = 3 + Math.random() * 3;
+    this.infectTimer = 2 + Math.random() * 3;
+    this.scanTimer   = 0;
+    this._targetCell = null;
+    this.infectingCell      = null;
+    this.infectionCompleted = false;
+    this._lastInfectedX = 0;
+    this._lastInfectedY = 0;
+    this.alive = true;
+  }
+
+  getActiveNote(tx, ty) {
+    const toward = Math.atan2(ty - this.y, tx - this.x);
+    let best = null, bestDiff = Infinity;
+    for (const dot of this.getDots()) {
+      const diff = Math.abs(angleDiff(dot.angle, toward));
+      if (diff < bestDiff) { bestDiff = diff; best = dot; }
+    }
+    return best.freq;
+  }
+
+  update(dt, cells, alertLevel = 0, rivalActivity = 0) {
+    this.rotation += this.rotationSpeed * dt;
+    this.infectionCompleted = false;
+
+    const speed = this.baseSpeed * (1 + alertLevel * 0.4);
+
+    // Advance active infection; orbit the cell while waiting
+    if (this.infectingCell) {
+      if (!this.infectingCell.active || this.infectingCell.infectingRival !== this) {
+        this.infectingCell = null;
+        this.infectTimer   = 3 + Math.random() * 3;
+        this._targetCell   = null;
+      } else {
+        this.infectingCell.rivalProgress += dt / 5;
+        if (this.infectingCell.rivalProgress >= 1) {
+          this._lastInfectedX               = this.infectingCell.x;
+          this._lastInfectedY               = this.infectingCell.y;
+          this.infectingCell.flashTimer     = 0.5;
+          this.infectingCell.rivalProgress  = 0;
+          this.infectingCell.infectingRival = null;
+          this.infectingCell.active         = false;
+          this.infectingCell                = null;
+          this.infectionCompleted           = true;
+          this._targetCell                  = null;
+          const activityFactor = Math.min(1, rivalActivity / 5);
+          this.infectTimer     = Math.max(3, 8 - activityFactor * 5);
+        }
+      }
+      if (this.infectingCell) {
+        const dx = this.infectingCell.x - this.x, dy = this.infectingCell.y - this.y;
+        const d  = Math.hypot(dx, dy) || 1;
+        const orbitR = this.radius + 45 + 5;
+        if (d > orbitR * 1.3) {
+          this.x += (dx / d) * speed * dt;
+          this.y += (dy / d) * speed * dt;
+        } else {
+          const perp = { x: -dy / d, y: dx / d };
+          const radial = (d - orbitR) / orbitR;
+          this.x += (perp.x * speed + dx / d * speed * 0.3 * radial) * dt;
+          this.y += (perp.y * speed + dy / d * speed * 0.3 * radial) * dt;
+        }
+      }
+      return;
+    }
+
+    // Scan for a new target only when we don't have a valid one — commit once selected
+    if (!this._targetCell || !this._targetCell.active || this._targetCell.infectingRival) {
+      this._targetCell = null;
+      this.scanTimer -= dt;
+      if (this.scanTimer <= 0) {
+        this.scanTimer = 1.0 + Math.random() * 0.5;
+        let bestCell = null, bestScore = Infinity;
+        for (const c of cells) {
+          if (!c.active || c.infectingRival) continue;
+          const myNote   = this.getActiveNote(c.x, c.y);
+          const cellNote = c.getActiveNote(this.x, this.y);
+          const r = roughness([myNote], [cellNote], DEFAULT_TIMBRE);
+          if (r < bestScore) { bestScore = r; bestCell = c; }
+        }
+        this._targetCell = bestCell;
+      }
+    }
+
+    if (this._targetCell) {
+      const dx = this._targetCell.x - this.x, dy = this._targetCell.y - this.y;
+      const d  = Math.hypot(dx, dy) || 1;
+      const jitter = d < 280 ? Math.sin(Date.now() / 900 + this.rotation) * 18 : 0;
+      const perp   = { x: -dy / d, y: dx / d };
+      this.x += ((dx / d) * speed + perp.x * jitter) * dt;
+      this.y += ((dy / d) * speed + perp.y * jitter) * dt;
+      this.vx = (dx / d) * this.baseSpeed;
+      this.vy = (dy / d) * this.baseSpeed;
+
+      this.infectTimer -= dt;
+      if (this.infectTimer <= 0 && d < this.radius + 45 + 8) {
+        this.infectingCell              = this._targetCell;
+        this._targetCell.infectingRival = this;
+        this._targetCell.rivalProgress  = 0;
+        this.infectTimer                = 999;
+      }
+    } else {
+      this.steerTimer -= dt;
+      if (this.steerTimer <= 0) {
+        this.steerTimer = 3 + Math.random() * 4;
+        const dir = Math.random() * Math.PI * 2;
+        this.vx = Math.cos(dir) * this.baseSpeed;
+        this.vy = Math.sin(dir) * this.baseSpeed;
+      }
+      const mag = Math.hypot(this.vx, this.vy) || 1;
+      this.x += (this.vx / mag) * speed * dt;
+      this.y += (this.vy / mag) * speed * dt;
+    }
+  }
+
+  getDots() {
+    return this.motif.map((freq, i) => {
+      const angle = this.rotation + i * (Math.PI / 3);
+      return { x: this.x + Math.cos(angle) * this.radius, y: this.y + Math.sin(angle) * this.radius, freq, angle };
+    });
+  }
+}
+
+// Small drifting entity produced by a completed rival infection.
+// Distracts macrophages; disappears after 35 s or when eaten.
+export class RivalClone {
+  constructor(x, y, strainId = 0, color = '#e63') {
+    this.x = x; this.y = y;
+    this.angle = 0;
+    this.radius = 10;
+    this.strainId = strainId;
+    this.color = color;
+    this.age    = 0;
+    const dir = Math.random() * Math.PI * 2;
+    const spd = 10 + Math.random() * 5;
+    this.vx = Math.cos(dir) * spd;
+    this.vy = Math.sin(dir) * spd;
+    this.steerTimer = 6 + Math.random() * 6;
+  }
+
+  update(dt) {
+    this.age += dt;
+    this.angle += 0.4 * dt;
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+    this.steerTimer -= dt;
+    if (this.steerTimer <= 0) {
+      this.steerTimer = 6 + Math.random() * 6;
+      const dir = Math.random() * Math.PI * 2;
+      const spd = 10 + Math.random() * 5;
+      this.vx = Math.cos(dir) * spd;
+      this.vy = Math.sin(dir) * spd;
+    }
+  }
+}
+
 export class Macrophage {
   constructor(x, y) {
     this.x = x; this.y = y;
@@ -252,6 +503,7 @@ export class Macrophage {
     this.target = null;
     this.retargetTimer = 0;
     this.driftAngle = Math.random() * Math.PI * 2;
+    this.distractedTarget = null; // non-clone entity currently being tracked
     // Blob shape: 9 spoke offsets, randomised once, animated via elapsed time
     this.spokeOffsets = Array.from({ length: 9 }, () => (Math.random() - 0.5) * 8);
     // Ghost triangles of ingested clones stored as {rx, ry} relative to centre
@@ -266,7 +518,7 @@ export class Macrophage {
     this.rallyPoint      = null; // {x,y} — rush here before resuming normal behaviour
   }
 
-  update(dt, clones, beatPhase, player, playerDissonance, tcellAdaptation) {
+  update(dt, clones, beatPhase, player, playerDissonance, tcellAdaptation, rivalClonePool = [], bacteria = []) {
     this.burstTimer = Math.max(0, this.burstTimer - dt);
     const adaptedSpeed = this.speed * (1 + (tcellAdaptation || 0)); // up to 2× at full adaptation
     const spd = this.burstTimer > 0 ? adaptedSpeed * 1.8 : adaptedSpeed;
@@ -295,14 +547,35 @@ export class Macrophage {
       const adaptation = tcellAdaptation || 0;
       // Probability of targeting player scales directly with player dissonance (complement + antibodies)
       if (player && Math.random() < dissonance + 0.5 * adaptation) {
-        this.targetingPlayer = true;
-        this.target = null;
+        this.targetingPlayer  = true;
+        this.target           = null;
+        this.distractedTarget = null;
       } else {
         this.targetingPlayer = false;
-        // Random clone selection — any clone is a valid target regardless of consonance
-        this.target = clones.length > 0
-          ? clones[Math.floor(Math.random() * clones.length)]
-          : null;
+        this.distractedTarget = null;
+        // Proportional split: macrophage attention mirrors clone population balance
+        const totalClones = clones.length + rivalClonePool.length;
+        if (totalClones > 0) {
+          const rivalShare = rivalClonePool.length / totalClones;
+          if (rivalClonePool.length > 0 && Math.random() < rivalShare) {
+            this.target = rivalClonePool[Math.floor(Math.random() * rivalClonePool.length)];
+          } else if (clones.length > 0) {
+            this.target = clones[Math.floor(Math.random() * clones.length)];
+          } else {
+            this.target = null;
+          }
+        } else {
+          this.target = null;
+        }
+        // If no clone target, consider wandering toward a bacterium
+        if (!this.target && bacteria.length > 0) {
+          const nearby = bacteria.filter(b => b.active && Math.hypot(b.x - this.x, b.y - this.y) < 280);
+          if (nearby.length > 0 && Math.random() < 0.25) {
+            const pick = nearby[Math.floor(Math.random() * nearby.length)];
+            this.target           = pick;
+            this.distractedTarget = pick;
+          }
+        }
       }
       // Retarget interval: increases as T-cells adapt (3s → 0.5s); player dissonance slows it down further
       const baseInterval   = adaptation * 3.0;
@@ -318,18 +591,27 @@ export class Macrophage {
       const perp       = { x: -dy / d, y: dx / d };
       this.x += (dx / d * spd + perp.x * lateralAmt) * dt;
       this.y += (dy / d * spd + perp.y * lateralAmt) * dt;
-    } else if (this.target && clones.includes(this.target)) {
+    } else if (this.target && (clones.includes(this.target) || rivalClonePool.includes(this.target))) {
       const dx = this.target.x - this.x;
       const dy = this.target.y - this.y;
       const d  = Math.hypot(dx, dy) || 1;
-      // On beat (beatPhase < 0.2): seek directly. Off-beat: orbit laterally.
       const onBeat     = beatPhase < 0.2;
       const lateralAmt = this.burstTimer > 0 ? 0 : (onBeat ? 0 : Math.sin(Date.now() / 550) * 38);
       const perp       = { x: -dy / d, y: dx / d };
       this.x += (dx / d * spd + perp.x * lateralAmt) * dt;
       this.y += (dy / d * spd + perp.y * lateralAmt) * dt;
+    } else if (this.distractedTarget === this.target && this.target) {
+      // Slow drift toward bacterium or rival clone
+      const dx = this.target.x - this.x, dy = this.target.y - this.y;
+      const d  = Math.hypot(dx, dy) || 1;
+      if (d < 40) { this.distractedTarget = null; this.target = null; this.retargetTimer = 0; }
+      else {
+        this.x += (dx / d) * spd * 0.6 * dt;
+        this.y += (dy / d) * spd * 0.6 * dt;
+      }
     } else {
-      this.target = null;
+      this.target           = null;
+      this.distractedTarget = null;
       this.driftAngle += (Math.random() - 0.5) * 0.4;
       this.x += Math.cos(this.driftAngle) * 18 * dt;
       this.y += Math.sin(this.driftAngle) * 18 * dt;
