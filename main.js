@@ -729,6 +729,9 @@ function loop(ts) {
           const rc = strain.clones[i];
           if (Math.hypot(m.x - rc.x, m.y - rc.y) < m.radius + rc.radius) {
             strain.clones.splice(i, 1);
+            const angle = Math.random() * Math.PI * 2;
+            const r = Math.random() * m.radius * 0.55;
+            m.capturedClones.push({ rx: Math.cos(angle) * r, ry: Math.sin(angle) * r, shape: 'hex' });
             m.target = null; m.retargetTimer = 0;
             break outerRC;
           }
@@ -745,6 +748,9 @@ function loop(ts) {
             }
             strain.viruses.splice(i, 1);
             strain.respawnTimer = 45;
+            const angle = Math.random() * Math.PI * 2;
+            const r = Math.random() * m.radius * 0.55;
+            m.capturedClones.push({ rx: Math.cos(angle) * r, ry: Math.sin(angle) * r, shape: 'hex' });
             m.target = null; m.retargetTimer = 0;
             break outerRV;
           }
@@ -996,7 +1002,7 @@ function loop(ts) {
   }
   for (const c of clones) drawClone(ctx, c);
   for (const b of blasts) drawNeutrophilBlast(ctx, b);
-  for (const m of macrophages) drawMacrophage(ctx, m, now);
+  for (const m of macrophages) drawMacrophage(ctx, m, now, immuneAlertLevel);
   for (const tc of tcells) {
     const pn = player.getActiveNote(tc.x, tc.y);
     const tn = tc.getActiveNote(player.x, player.y);

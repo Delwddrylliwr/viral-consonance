@@ -348,16 +348,29 @@ export function drawLetterBond(ctx, bond) {
   ctx.restore();
 }
 
-// Amorphous blob body with ghost triangles of ingested clones inside
-export function drawMacrophage(ctx, m, time) {
+// Lobular body with rolling sine/triangle-wave perimeter; ghost shapes of ingested clones inside
+export function drawMacrophage(ctx, m, time, immuneAlert = 0) {
   ctx.save();
   ctx.translate(m.x, m.y);
 
-  const N = m.spokeOffsets.length;
-  const pts = m.spokeOffsets.map((off, i) => {
-    const a = (i / N) * Math.PI * 2;
-    const r = m.radius + off + Math.sin(time * 0.6 + i * 0.8) * 5;
-    return { x: Math.cos(a) * r, y: Math.sin(a) * r };
+  const N      = 60;
+  const k      = 8;                          // 4 lobes — matches 4-fold symmetry of other cells
+  const roll   = time * 0.75 + m.rollOffset;
+  const maxAmp = 10;
+  const amp    = maxAmp * Math.max(0, 1 - m.consumeCount / m.maxConsumes);
+
+  // Lerp between sine (alert=0) and triangle wave (alert=1)
+  function wave(a) {
+    const s = Math.sin(a);
+    const t = (2 / Math.PI) * Math.asin(Math.sin(a));
+    return (1 - immuneAlert) * s + immuneAlert * t;
+  }
+
+  const pts = Array.from({ length: N }, (_, i) => {
+    const theta = (i / N) * Math.PI * 2;
+    const undulation = amp * 0.6 * Math.sin(theta - time + m.rollOffset2);
+    const r = m.radius + amp * wave(k * theta + roll) + undulation;
+    return { x: Math.cos(theta) * r, y: Math.sin(theta) * r };
   });
   const eating = m.eatingPlayer;
   const pulse  = eating ? 0.5 + 0.5 * Math.sin(time * 10) : 0;
@@ -378,19 +391,20 @@ export function drawMacrophage(ctx, m, time) {
   ctx.lineWidth = eating ? 3 + pulse * 2 : 2;
   ctx.stroke();
 
-  // Ghost triangles of ingested clones
+  // Ghost shapes of ingested clones: triangles for player clones, hexagons for rivals
   for (const c of m.capturedClones) {
     ctx.save();
     ctx.translate(c.rx, c.ry);
     ctx.globalAlpha = 0.28;
+    const sides = c.shape === 'hex' ? 6 : 3;
     ctx.beginPath();
-    for (let i = 0; i < 3; i++) {
-      const a = (i / 3) * Math.PI * 2;
+    for (let i = 0; i < sides; i++) {
+      const a = (i / sides) * Math.PI * 2;
       if (i === 0) ctx.moveTo(Math.cos(a) * 6, Math.sin(a) * 6);
       else ctx.lineTo(Math.cos(a) * 6, Math.sin(a) * 6);
     }
     ctx.closePath();
-    ctx.strokeStyle = '#0ff';
+    ctx.strokeStyle = c.shape === 'hex' ? '#f80' : '#0ff';
     ctx.lineWidth = 1;
     ctx.stroke();
     ctx.restore();

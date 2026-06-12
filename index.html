@@ -168,13 +168,14 @@
       }
 
       function miniMacrophage(ctx, cx, cy) {
-        const N = 10, r = 15;
+        const k=8, N = 60, radius = 15, amp = 2;
         ctx.save();
         ctx.translate(cx, cy);
         const pts = Array.from({ length: N }, (_, i) => {
-          const a = (i / N) * Math.PI * 2;
-          const rr = r + Math.sin(i * 1.7) * 4;
-          return { x: Math.cos(a) * rr, y: Math.sin(a) * rr };
+          const theta = (i / N) * Math.PI * 2;
+          const undulation = amp * Math.sin(theta);
+          const r = radius + amp * Math.sin(k * theta) + undulation;
+          return { x: Math.cos(theta) * r, y: Math.sin(theta) * r };
         });
         ctx.beginPath();
         for (let i = 0; i < N; i++) {

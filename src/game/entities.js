@@ -498,14 +498,15 @@ export class RivalClone {
 export class Macrophage {
   constructor(x, y) {
     this.x = x; this.y = y;
-    this.radius = 26;
+    this.radius = 35;
     this.speed  = 52;
     this.target = null;
     this.retargetTimer = 0;
     this.driftAngle = Math.random() * Math.PI * 2;
     this.distractedTarget = null; // non-clone entity currently being tracked
-    // Blob shape: 9 spoke offsets, randomised once, animated via elapsed time
-    this.spokeOffsets = Array.from({ length: 9 }, () => (Math.random() - 0.5) * 8);
+    // Perimeter wave: two random phase offsets drive rolling and amplitude undulation
+    this.rollOffset  = Math.random() * Math.PI * 2;
+    this.rollOffset2 = Math.random() * Math.PI * 2;
     // Ghost triangles of ingested clones stored as {rx, ry} relative to centre
     this.capturedClones = [];
     this.targetingPlayer = false;
