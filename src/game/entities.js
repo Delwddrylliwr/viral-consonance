@@ -360,7 +360,7 @@ export class RivalVirus {
     return best.freq;
   }
 
-  update(dt, cells, alertLevel = 0, rivalActivity = 0) {
+  update(dt, cells, alertLevel = 0, rivalActivity = 0, macrophages = [], neutrophils = []) {
     this.rotation += this.rotationSpeed * dt;
     this.infectionCompleted = false;
 
@@ -414,10 +414,12 @@ export class RivalVirus {
         let bestCell = null, bestScore = Infinity;
         for (const c of cells) {
           if (!c.active || c.infectingRival) continue;
+          const dist     = Math.hypot(c.x - this.x, c.y - this.y);
           const myNote   = this.getActiveNote(c.x, c.y);
           const cellNote = c.getActiveNote(this.x, this.y);
-          const r = roughness([myNote], [cellNote], DEFAULT_TIMBRE);
-          if (r < bestScore) { bestScore = r; bestCell = c; }
+          const r        = roughness([myNote], [cellNote], DEFAULT_TIMBRE);
+          const score    = dist + r * 400;   // dissonant cells feel up to 400 px farther
+          if (score < bestScore) { bestScore = score; bestCell = c; }
         }
         this._targetCell = bestCell;
       }
@@ -451,6 +453,27 @@ export class RivalVirus {
       const mag = Math.hypot(this.vx, this.vy) || 1;
       this.x += (this.vx / mag) * speed * dt;
       this.y += (this.vy / mag) * speed * dt;
+    }
+
+    // Evade nearby macrophages and neutrophils (orbit block returns early, so this only
+    // runs during free movement — rival stays committed to infection once orbiting)
+    let ex = 0, ey = 0;
+    for (const t of macrophages) {
+      if (t.dead) continue;
+      const dx = this.x - t.x, dy = this.y - t.y;
+      const d  = Math.hypot(dx, dy);
+      if (d < 120 && d > 0) { const w = (1 - d / 120) ** 2; ex += dx / d * w; ey += dy / d * w; }
+    }
+    for (const t of neutrophils) {
+      if (t.dead) continue;
+      const dx = this.x - t.x, dy = this.y - t.y;
+      const d  = Math.hypot(dx, dy);
+      if (d < 120 && d > 0) { const w = (1 - d / 120) ** 2; ex += dx / d * w; ey += dy / d * w; }
+    }
+    const em = Math.hypot(ex, ey);
+    if (em > 0) {
+      this.x += (ex / em) * speed * 0.55 * dt;
+      this.y += (ey / em) * speed * 0.55 * dt;
     }
   }
 

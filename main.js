@@ -916,7 +916,7 @@ function loop(ts) {
 
     // Update viruses; handle infection completions
     for (const rv of strain.viruses) {
-      rv.update(dt, cells, immuneAlertLevel, strain.clones.length);
+      rv.update(dt, cells, immuneAlertLevel, strain.clones.length, macrophages, neutrophils);
       if (rv.infectionCompleted) {
         // More viruses spawn when immune is focused on player and strain already has clones
         if (immuneAlertLevel >= 0.1 && strain.clones.length >= 2) {
