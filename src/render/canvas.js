@@ -415,7 +415,7 @@ export function drawMacrophage(ctx, m, time, immuneAlert = 0) {
 
 // Slowly rotating square — 4-note motif at corners, visible when matchable (player fully loaded with proteins)
 // immuneAlert: 0–1 drives green→yellow→red colour shift plus visual intensity cues
-export function drawTCell(ctx, tc, matchable = false, immuneAlert = 0, tcellAdaptation = 0) {
+export function drawTCell(ctx, tc, matchable = false, immuneAlert = 0, tcellAdaptation = 0, tcellRivalAdaptation = 0) {
   // Base colour: green→yellow→red along alert level; purple overrides when vulnerable
   const hue   = 120 - immuneAlert * 120;          // 120 (green) → 0 (red)
   const sat   = 65 + immuneAlert * 25;             // 65% → 90%
@@ -452,15 +452,27 @@ export function drawTCell(ctx, tc, matchable = false, immuneAlert = 0, tcellAdap
     ? 'rgba(180, 80, 255, 0.18)'
     : `hsla(${hue}, ${sat}%, ${light}%, ${fillAlpha})`;
   ctx.fill();
-  // Interior player-virus replica — triangle grows more visible as T-cell adapts
+  // Interior shapes: triangle = player focus, hexagon = rival focus; crossfade as adaptation shifts
+  const r = s * 0.48;
+  ctx.lineWidth = 1.5;
   if (tcellAdaptation > 0.05) {
-    const r = s * 0.48;
-    ctx.globalAlpha = tcellAdaptation * 0.6;
+    ctx.globalAlpha = tcellAdaptation * 0.6 * (1 - tcellRivalAdaptation);
     ctx.strokeStyle = `hsl(${hue}, 90%, 68%)`;
-    ctx.lineWidth = 1.5;
     ctx.beginPath();
     for (let i = 0; i < 3; i++) {
       const a = (i / 3) * Math.PI * 2 - Math.PI / 2;
+      if (i === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+      else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  }
+  if (tcellRivalAdaptation > 0.05) {
+    ctx.globalAlpha = tcellRivalAdaptation * 0.65;
+    ctx.strokeStyle = '#f80';
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
       if (i === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
       else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
     }
@@ -591,7 +603,7 @@ export function drawAntibody(ctx, ab) {
 }
 
 // Jittering 8-point star; glowing countdown arc when attached to a clone
-export function drawNeutrophil(ctx, n) {
+export function drawNeutrophil(ctx, n, immuneAlert = 0) {
   ctx.save();
   ctx.translate(n.x, n.y);
 
@@ -612,9 +624,10 @@ export function drawNeutrophil(ctx, n) {
 
   ctx.rotate(n.jitterAngle);
 
-  // 8-point star (outer/inner radius ratio matches macrophage spoke feel)
-  const outerR = n.radius;
-  const innerR = n.radius * 0.42;
+  // 8-point star — inner radius shrinks and colour shifts toward red as alert rises
+  const outerR = n.radius * (1 + immuneAlert * 0.15);
+  const innerR = n.radius * (0.42 - immuneAlert * 0.22);  // 0.42 → 0.20: much sharper spikes at high alert
+  const hue    = Math.round(45 - immuneAlert * 45);        // yellow (45°) → red (0°)
   ctx.beginPath();
   for (let i = 0; i < 16; i++) {
     const a  = (i / 16) * Math.PI * 2 - Math.PI / 8;
@@ -623,8 +636,8 @@ export function drawNeutrophil(ctx, n) {
     else ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
   }
   ctx.closePath();
-  ctx.fillStyle   = 'rgba(255, 215, 40, 0.5)';
-  ctx.strokeStyle = '#ffd428';
+  ctx.fillStyle   = `hsla(${hue}, 100%, 58%, 0.5)`;
+  ctx.strokeStyle = `hsl(${hue}, 100%, 55%)`;
   ctx.lineWidth   = 1.5;
   ctx.fill();
   ctx.stroke();

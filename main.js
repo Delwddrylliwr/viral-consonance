@@ -94,8 +94,10 @@ let nextStrainIdx;    // which RIVAL_DEFS entry to introduce next
 let antibodySpawnTimer  = 15;
 let tcellRespawnTimer   = 0;
 let immuneAlertLevel = 0;
-let tcellAdaptation  = 0; // 0→1, grows ∝ BPM, resets on chord mutation
-let bcellAdaptation  = 0; // grows with BPM/clone-load; caps n-phil max and gates a-body launches
+let tcellAdaptation      = 0; // 0→1, grows ∝ BPM, resets on chord mutation
+let bcellAdaptation      = 0; // grows with BPM/clone-load; caps n-phil max and gates a-body launches
+let tcellRivalAdaptation = 0; // T-cell focus redirected to rivals when rival clones dominate
+let bcellRivalAdaptation = 0; // B-cell focus redirected to rivals when rival clones dominate
 let tcellAdaptKnownChord = null;
 let bcellAdaptKnownChord = null;
 let nphilSpawnTimer  = 0;
@@ -268,6 +270,8 @@ function init() {
   immuneAlertLevel     = 0;
   tcellAdaptation      = 0;
   bcellAdaptation      = 0;
+  tcellRivalAdaptation = 0;
+  bcellRivalAdaptation = 0;
   tcellAdaptKnownChord = null;
   bcellAdaptKnownChord = null;
   nphilSpawnTimer      = 15; // 15s grace period before first neutrophil
@@ -631,14 +635,22 @@ function loop(ts) {
     const tcellEvading = tcells.some(tc => tc.isEvading);
     const bcellFleeing = bcells.some(bc => Math.hypot(bc.x - player.x, bc.y - player.y) < 300);
     const baseBpmRate  = dt * (getBPM() / BASE_BPM);
-    // T-cell adaptation toward player pauses when rival clones outnumber player clones
-    const tcellRivalPause = allRivalClones.length > clones.length;
-    if (tcellAdaptKnownChord !== null && tcellAdaptKnownChord !== chordKey) tcellAdaptation = 0;
+    // Fraction of total clone population that are rivals (0 = player dominant, 1 = rival dominant)
+    const rivalFocus = allRivalClones.length / Math.max(1, clones.length + allRivalClones.length);
+    if (tcellAdaptKnownChord !== null && tcellAdaptKnownChord !== chordKey) { tcellAdaptation = 0; tcellRivalAdaptation = 0; }
     tcellAdaptKnownChord = chordKey;
-    tcellAdaptation = Math.min(1, tcellAdaptation + baseBpmRate / 120 * (tcellEvading ? 3 : 1) * (tcellRivalPause ? 0 : 1));
-    if (bcellAdaptKnownChord !== null && bcellAdaptKnownChord !== chordKey) bcellAdaptation = 0;
+    const tBase = baseBpmRate / 120 * (tcellEvading ? 3 : 1);
+    tcellAdaptation      = Math.min(1, tcellAdaptation      + tBase * (1 - rivalFocus));
+    tcellRivalAdaptation = Math.min(1, tcellRivalAdaptation + tBase * rivalFocus * 1.2);
+    if (rivalFocus > 0.5) tcellAdaptation      = Math.max(0, tcellAdaptation      - tBase * 0.4);
+    else                  tcellRivalAdaptation = Math.max(0, tcellRivalAdaptation - tBase * 0.4);
+    if (bcellAdaptKnownChord !== null && bcellAdaptKnownChord !== chordKey) { bcellAdaptation = 0; bcellRivalAdaptation = 0; }
     bcellAdaptKnownChord = chordKey;
-    bcellAdaptation = Math.min(1, bcellAdaptation + baseBpmRate / 120 * (bcellFleeing ? 3 : 1));
+    const bBase = baseBpmRate / 120 * (bcellFleeing ? 3 : 1);
+    bcellAdaptation      = Math.min(1, bcellAdaptation      + bBase * (1 - rivalFocus));
+    bcellRivalAdaptation = Math.min(1, bcellRivalAdaptation + bBase * rivalFocus * 1.2);
+    if (rivalFocus > 0.5) bcellAdaptation      = Math.max(0, bcellAdaptation      - bBase * 0.4);
+    else                  bcellRivalAdaptation = Math.max(0, bcellRivalAdaptation - bBase * 0.4);
   }
 
   // T-cell: respawns after a delay (longer if last one was neutralised by player)
@@ -693,7 +705,7 @@ function loop(ts) {
 
   for (const m of macrophages) {
     m.update(dt, clones, beatPhase, player, attachmentDissonance, tcellAdaptation,
-             allRivalClones, bacteria.filter(b => b.active));
+             allRivalClones, bacteria.filter(b => b.active), tcellRivalAdaptation);
 
     // Macrophage eats player: contact starts a 2s eat window; shake to escape
     if (m.targetingPlayer && !m.eatingPlayer
@@ -764,7 +776,7 @@ function loop(ts) {
   nphilSpawnTimer = Math.max(0, nphilSpawnTimer - dt);
   const nphilMaxCount      = Math.floor(tcellAdaptation * 4) + 1;          // 1 → 5 as T-cells adapt
   const nphilSpawnInterval = Math.max(2, 20 - bcellAdaptation * 18);      // 20s → 3s as B-cells adapt
-  if (neutrophils.length < nphilMaxCount && clones.length > 0 && nphilSpawnTimer <= 0) {
+  if (neutrophils.length < nphilMaxCount && (clones.length > 0 || (allRivalClones.length > 0 && bcellRivalAdaptation > 0.3)) && nphilSpawnTimer <= 0) {
     neutrophils.push(new Neutrophil(...randomEdgePos()));
     nphilSpawnTimer = nphilSpawnInterval;
   }
@@ -1006,10 +1018,10 @@ function loop(ts) {
   for (const tc of tcells) {
     const pn = player.getActiveNote(tc.x, tc.y);
     const tn = tc.getActiveNote(player.x, player.y);
-    drawTCell(ctx, tc, roughness([pn], [tn], DEFAULT_TIMBRE) < TCELL_CAPTURE_THRESHOLD, immuneAlertLevel, tcellAdaptation);
+    drawTCell(ctx, tc, roughness([pn], [tn], DEFAULT_TIMBRE) < TCELL_CAPTURE_THRESHOLD, immuneAlertLevel, tcellAdaptation, tcellRivalAdaptation);
   }
   for (const ab of antibodies) drawAntibody(ctx, ab);
-  for (const n of neutrophils) if (!n.dead) drawNeutrophil(ctx, n);
+  for (const n of neutrophils) if (!n.dead) drawNeutrophil(ctx, n, immuneAlertLevel);
   drawPlayer(ctx, player, activePlayerNote);
   for (const p of proteins) drawProtein(ctx, p, player);
   drawLetterBond(ctx, letterBondFlash);
