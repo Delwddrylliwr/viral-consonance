@@ -360,7 +360,7 @@ export class RivalVirus {
     return best.freq;
   }
 
-  update(dt, cells, alertLevel = 0, rivalActivity = 0) {
+  update(dt, cells, alertLevel = 0, rivalActivity = 0, macrophages = [], neutrophils = []) {
     this.rotation += this.rotationSpeed * dt;
     this.infectionCompleted = false;
 
@@ -414,10 +414,12 @@ export class RivalVirus {
         let bestCell = null, bestScore = Infinity;
         for (const c of cells) {
           if (!c.active || c.infectingRival) continue;
+          const dist     = Math.hypot(c.x - this.x, c.y - this.y);
           const myNote   = this.getActiveNote(c.x, c.y);
           const cellNote = c.getActiveNote(this.x, this.y);
-          const r = roughness([myNote], [cellNote], DEFAULT_TIMBRE);
-          if (r < bestScore) { bestScore = r; bestCell = c; }
+          const r        = roughness([myNote], [cellNote], DEFAULT_TIMBRE);
+          const score    = dist + r * 400;   // dissonant cells feel up to 400 px farther
+          if (score < bestScore) { bestScore = score; bestCell = c; }
         }
         this._targetCell = bestCell;
       }
@@ -451,6 +453,27 @@ export class RivalVirus {
       const mag = Math.hypot(this.vx, this.vy) || 1;
       this.x += (this.vx / mag) * speed * dt;
       this.y += (this.vy / mag) * speed * dt;
+    }
+
+    // Evade nearby macrophages and neutrophils (orbit block returns early, so this only
+    // runs during free movement — rival stays committed to infection once orbiting)
+    let ex = 0, ey = 0;
+    for (const t of macrophages) {
+      if (t.dead) continue;
+      const dx = this.x - t.x, dy = this.y - t.y;
+      const d  = Math.hypot(dx, dy);
+      if (d < 120 && d > 0) { const w = (1 - d / 120) ** 2; ex += dx / d * w; ey += dy / d * w; }
+    }
+    for (const t of neutrophils) {
+      if (t.dead) continue;
+      const dx = this.x - t.x, dy = this.y - t.y;
+      const d  = Math.hypot(dx, dy);
+      if (d < 120 && d > 0) { const w = (1 - d / 120) ** 2; ex += dx / d * w; ey += dy / d * w; }
+    }
+    const em = Math.hypot(ex, ey);
+    if (em > 0) {
+      this.x += (ex / em) * speed * 0.55 * dt;
+      this.y += (ey / em) * speed * 0.55 * dt;
     }
   }
 
@@ -498,14 +521,15 @@ export class RivalClone {
 export class Macrophage {
   constructor(x, y) {
     this.x = x; this.y = y;
-    this.radius = 26;
+    this.radius = 35;
     this.speed  = 52;
     this.target = null;
     this.retargetTimer = 0;
     this.driftAngle = Math.random() * Math.PI * 2;
     this.distractedTarget = null; // non-clone entity currently being tracked
-    // Blob shape: 9 spoke offsets, randomised once, animated via elapsed time
-    this.spokeOffsets = Array.from({ length: 9 }, () => (Math.random() - 0.5) * 8);
+    // Perimeter wave: two random phase offsets drive rolling and amplitude undulation
+    this.rollOffset  = Math.random() * Math.PI * 2;
+    this.rollOffset2 = Math.random() * Math.PI * 2;
     // Ghost triangles of ingested clones stored as {rx, ry} relative to centre
     this.capturedClones = [];
     this.targetingPlayer = false;
@@ -518,7 +542,7 @@ export class Macrophage {
     this.rallyPoint      = null; // {x,y} — rush here before resuming normal behaviour
   }
 
-  update(dt, clones, beatPhase, player, playerDissonance, tcellAdaptation, rivalClonePool = [], bacteria = []) {
+  update(dt, clones, beatPhase, player, playerDissonance, tcellAdaptation, rivalClonePool = [], bacteria = [], tcellRivalAdaptation = 0) {
     this.burstTimer = Math.max(0, this.burstTimer - dt);
     const adaptedSpeed = this.speed * (1 + (tcellAdaptation || 0)); // up to 2× at full adaptation
     const spd = this.burstTimer > 0 ? adaptedSpeed * 1.8 : adaptedSpeed;
@@ -553,10 +577,11 @@ export class Macrophage {
       } else {
         this.targetingPlayer = false;
         this.distractedTarget = null;
-        // Proportional split: macrophage attention mirrors clone population balance
-        const totalClones = clones.length + rivalClonePool.length;
+        // Rival targeting weight boosted by tcellRivalAdaptation — rivals count more when immune system adapts to them
+        const rivalWeight = rivalClonePool.length * (1 + (tcellRivalAdaptation || 0) * 2);
+        const totalClones = clones.length + rivalWeight;
         if (totalClones > 0) {
-          const rivalShare = rivalClonePool.length / totalClones;
+          const rivalShare = rivalWeight / totalClones;
           if (rivalClonePool.length > 0 && Math.random() < rivalShare) {
             this.target = rivalClonePool[Math.floor(Math.random() * rivalClonePool.length)];
           } else if (clones.length > 0) {
@@ -782,7 +807,7 @@ export class Antibody {
 export class Neutrophil {
   constructor(x, y) {
     this.x = x; this.y = y;
-    this.radius      = 13;
+    this.radius      = 25;
     this.speed       = 145;
     this.target      = null;
     this.attached    = false;

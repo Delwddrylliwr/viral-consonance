@@ -348,16 +348,29 @@ export function drawLetterBond(ctx, bond) {
   ctx.restore();
 }
 
-// Amorphous blob body with ghost triangles of ingested clones inside
-export function drawMacrophage(ctx, m, time) {
+// Lobular body with rolling sine/triangle-wave perimeter; ghost shapes of ingested clones inside
+export function drawMacrophage(ctx, m, time, immuneAlert = 0) {
   ctx.save();
   ctx.translate(m.x, m.y);
 
-  const N = m.spokeOffsets.length;
-  const pts = m.spokeOffsets.map((off, i) => {
-    const a = (i / N) * Math.PI * 2;
-    const r = m.radius + off + Math.sin(time * 0.6 + i * 0.8) * 5;
-    return { x: Math.cos(a) * r, y: Math.sin(a) * r };
+  const N      = 60;
+  const k      = 8;                          // 4 lobes — matches 4-fold symmetry of other cells
+  const roll   = time * 0.75 + m.rollOffset;
+  const maxAmp = 10;
+  const amp    = maxAmp * Math.max(0, 1 - m.consumeCount / m.maxConsumes);
+
+  // Lerp between sine (alert=0) and triangle wave (alert=1)
+  function wave(a) {
+    const s = Math.sin(a);
+    const t = (2 / Math.PI) * Math.asin(Math.sin(a));
+    return (1 - immuneAlert) * s + immuneAlert * t;
+  }
+
+  const pts = Array.from({ length: N }, (_, i) => {
+    const theta = (i / N) * Math.PI * 2;
+    const undulation = amp * 0.6 * Math.sin(theta - time + m.rollOffset2);
+    const r = m.radius + amp * wave(k * theta + roll) + undulation;
+    return { x: Math.cos(theta) * r, y: Math.sin(theta) * r };
   });
   const eating = m.eatingPlayer;
   const pulse  = eating ? 0.5 + 0.5 * Math.sin(time * 10) : 0;
@@ -378,19 +391,20 @@ export function drawMacrophage(ctx, m, time) {
   ctx.lineWidth = eating ? 3 + pulse * 2 : 2;
   ctx.stroke();
 
-  // Ghost triangles of ingested clones
+  // Ghost shapes of ingested clones: triangles for player clones, hexagons for rivals
   for (const c of m.capturedClones) {
     ctx.save();
     ctx.translate(c.rx, c.ry);
     ctx.globalAlpha = 0.28;
+    const sides = c.shape === 'hex' ? 6 : 3;
     ctx.beginPath();
-    for (let i = 0; i < 3; i++) {
-      const a = (i / 3) * Math.PI * 2;
+    for (let i = 0; i < sides; i++) {
+      const a = (i / sides) * Math.PI * 2;
       if (i === 0) ctx.moveTo(Math.cos(a) * 6, Math.sin(a) * 6);
       else ctx.lineTo(Math.cos(a) * 6, Math.sin(a) * 6);
     }
     ctx.closePath();
-    ctx.strokeStyle = '#0ff';
+    ctx.strokeStyle = c.shape === 'hex' ? '#f80' : '#0ff';
     ctx.lineWidth = 1;
     ctx.stroke();
     ctx.restore();
@@ -401,7 +415,7 @@ export function drawMacrophage(ctx, m, time) {
 
 // Slowly rotating square — 4-note motif at corners, visible when matchable (player fully loaded with proteins)
 // immuneAlert: 0–1 drives green→yellow→red colour shift plus visual intensity cues
-export function drawTCell(ctx, tc, matchable = false, immuneAlert = 0, tcellAdaptation = 0) {
+export function drawTCell(ctx, tc, matchable = false, immuneAlert = 0, tcellAdaptation = 0, tcellRivalAdaptation = 0) {
   // Base colour: green→yellow→red along alert level; purple overrides when vulnerable
   const hue   = 120 - immuneAlert * 120;          // 120 (green) → 0 (red)
   const sat   = 65 + immuneAlert * 25;             // 65% → 90%
@@ -438,15 +452,27 @@ export function drawTCell(ctx, tc, matchable = false, immuneAlert = 0, tcellAdap
     ? 'rgba(180, 80, 255, 0.18)'
     : `hsla(${hue}, ${sat}%, ${light}%, ${fillAlpha})`;
   ctx.fill();
-  // Interior player-virus replica — triangle grows more visible as T-cell adapts
+  // Interior shapes: triangle = player focus, hexagon = rival focus; crossfade as adaptation shifts
+  const r = s * 0.48;
+  ctx.lineWidth = 1.5;
   if (tcellAdaptation > 0.05) {
-    const r = s * 0.48;
-    ctx.globalAlpha = tcellAdaptation * 0.6;
+    ctx.globalAlpha = tcellAdaptation * 0.6 * (1 - tcellRivalAdaptation);
     ctx.strokeStyle = `hsl(${hue}, 90%, 68%)`;
-    ctx.lineWidth = 1.5;
     ctx.beginPath();
     for (let i = 0; i < 3; i++) {
       const a = (i / 3) * Math.PI * 2 - Math.PI / 2;
+      if (i === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+      else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  }
+  if (tcellRivalAdaptation > 0.05) {
+    ctx.globalAlpha = tcellRivalAdaptation * 0.65;
+    ctx.strokeStyle = '#f80';
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
       if (i === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
       else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
     }
@@ -577,7 +603,7 @@ export function drawAntibody(ctx, ab) {
 }
 
 // Jittering 8-point star; glowing countdown arc when attached to a clone
-export function drawNeutrophil(ctx, n) {
+export function drawNeutrophil(ctx, n, immuneAlert = 0) {
   ctx.save();
   ctx.translate(n.x, n.y);
 
@@ -598,9 +624,10 @@ export function drawNeutrophil(ctx, n) {
 
   ctx.rotate(n.jitterAngle);
 
-  // 8-point star (outer/inner radius ratio matches macrophage spoke feel)
-  const outerR = n.radius;
-  const innerR = n.radius * 0.42;
+  // 8-point star — inner radius shrinks and colour shifts toward red as alert rises
+  const outerR = n.radius * (1 + immuneAlert * 0.15);
+  const innerR = n.radius * (0.42 - immuneAlert * 0.22);  // 0.42 → 0.20: much sharper spikes at high alert
+  const hue    = Math.round(45 - immuneAlert * 45);        // yellow (45°) → red (0°)
   ctx.beginPath();
   for (let i = 0; i < 16; i++) {
     const a  = (i / 16) * Math.PI * 2 - Math.PI / 8;
@@ -609,8 +636,8 @@ export function drawNeutrophil(ctx, n) {
     else ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
   }
   ctx.closePath();
-  ctx.fillStyle   = 'rgba(255, 215, 40, 0.5)';
-  ctx.strokeStyle = '#ffd428';
+  ctx.fillStyle   = `hsla(${hue}, 100%, 58%, 0.5)`;
+  ctx.strokeStyle = `hsl(${hue}, 100%, 55%)`;
   ctx.lineWidth   = 1.5;
   ctx.fill();
   ctx.stroke();
