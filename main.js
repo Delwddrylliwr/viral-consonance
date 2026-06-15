@@ -332,6 +332,11 @@ function init() {
           if (idx !== -1) {
             clones.splice(idx, 1);
             setTempo(BASE_BPM + clones.length * BPM_PER_CLONE);
+          } else {
+            for (const strain of rivalStrains) {
+              const ri = strain.clones.indexOf(n.target);
+              if (ri !== -1) { strain.clones.splice(ri, 1); break; }
+            }
           }
           n.dead = true;
           playNeutrophilExplode();
@@ -626,7 +631,8 @@ function loop(ts) {
     (attachedProteinCount + attachedAntibodyCount) / 3 + bounceTargetTimer * 0.5);
 
   // Flat array of all rival clones across strains — used for macrophage targeting and T-cell pause
-  const allRivalClones = rivalStrains.flatMap(s => s.clones);
+  const allRivalClones   = rivalStrains.flatMap(s => s.clones);
+  const allRivalViruses  = rivalStrains.flatMap(s => s.viruses);
 
   // T-cell and B-cell adaptation: grow proportional to BPM, reset when player chord mutates;
   // evasion (player proximity) accelerates each cell type's own adaptation independently
@@ -791,8 +797,11 @@ function loop(ts) {
       n.targetingPlayer = shouldTargetPlayer;
       n.playerTarget    = shouldTargetPlayer ? player : null;
     }
-    n.update(dt, clones);
-    if (!n.attached && !n.targetingPlayer && n.target && clones.includes(n.target)
+    // Clone targeting follows T-cell adaptation focus: rival-adapted → rival clones only, and vice versa
+    const nphilRivalFocus = tcellRivalAdaptation > tcellAdaptation;
+    n.update(dt, nphilRivalFocus ? [] : clones, nphilRivalFocus ? allRivalClones : []);
+    if (!n.attached && !n.targetingPlayer && n.target
+        && (clones.includes(n.target) || allRivalClones.includes(n.target))
         && Math.hypot(n.x - n.target.x, n.y - n.target.y) < n.radius + n.target.radius) {
       n.attached = true;
     }
@@ -819,6 +828,21 @@ function loop(ts) {
       if (d > prevRadius && d <= b.radius) {
         clones.splice(i, 1);
         setTempo(BASE_BPM + clones.length * BPM_PER_CLONE);
+      }
+    }
+    for (const strain of rivalStrains) {
+      for (let i = strain.clones.length - 1; i >= 0; i--) {
+        const d = Math.hypot(b.x - strain.clones[i].x, b.y - strain.clones[i].y);
+        if (d > prevRadius && d <= b.radius) strain.clones.splice(i, 1);
+      }
+      for (let i = strain.viruses.length - 1; i >= 0; i--) {
+        const rv = strain.viruses[i];
+        const d  = Math.hypot(b.x - rv.x, b.y - rv.y);
+        if (d > prevRadius && d <= b.radius) {
+          if (rv.infectingCell) { rv.infectingCell.infectingRival = null; rv.infectingCell.rivalProgress = 0; }
+          strain.viruses.splice(i, 1);
+          strain.respawnTimer = 45;
+        }
       }
     }
     // Ring sweeps through player — lethal only if dissonant

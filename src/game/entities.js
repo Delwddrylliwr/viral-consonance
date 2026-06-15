@@ -821,7 +821,7 @@ export class Neutrophil {
     this.playerLatchCooldown = 0; // s — prevents immediate re-attach after shake-off
   }
 
-  update(dt, clones) {
+  update(dt, clones, rivalClones = []) {
     if (this.dead) return;
     this.jitterTimer -= dt;
     if (this.jitterTimer <= 0) {
@@ -833,15 +833,16 @@ export class Neutrophil {
       this.y = this.playerTarget.y;
       return;
     }
-    if (this.attached && this.target && clones.includes(this.target)) {
+    const allTargets = [...clones, ...rivalClones];
+    if (this.attached && this.target && allTargets.includes(this.target)) {
       this.x = this.target.x;
       this.y = this.target.y;
       return;
     }
     this.attached = false; // target was removed
-    if (!this.target || !clones.includes(this.target)) {
-      this.target = clones.length > 0
-        ? clones.reduce((b, c) => {
+    if (!this.target || !allTargets.includes(this.target)) {
+      this.target = allTargets.length > 0
+        ? allTargets.reduce((b, c) => {
             const db = b ? Math.hypot(b.x - this.x, b.y - this.y) : Infinity;
             const dc = Math.hypot(c.x - this.x, c.y - this.y);
             return dc < db ? c : b;
