@@ -769,6 +769,7 @@ export class Antibody {
     this.matchingNote    = PLAYER_CHORD[targetNoteIdx];
     this.attached      = false;
     this.attachAngle   = 0;
+    this.attachDrag = 0.2;
     this.vx = 0; this.vy = 0;
     this.maxSpeed    = 240;  // px/s — faster pursuit
     this.accel       = 420;  // px/s² toward player
@@ -890,7 +891,7 @@ export class BCell {
     this.flashTimer  = 0;
     this.launchTimer = 8 + Math.random() * 6; // time until first antibody launch
     this.speed       = 60;   // slow enough to be catchable
-    this.fleeSpeed   = 150;   // faster when player is close
+    this.fleeSpeed   = 100;   // faster when player is close
     this.color       = '#a3f';
     // 8-note motif at octagon corners (based on antibody freq harmonics)
     this.motif = [369.99, 392.00, 415.30, 440.00, 466.16, 493.88, 523.25, 554.37];

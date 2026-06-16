@@ -62,10 +62,18 @@ const BPM_DANGER_MARGIN        = 5 * BPM_PER_CLONE; // border glow starts 5 clon
 const MAX_CLONES_PER_INFECTION = 3;
 const STARTER_CLONES           = 8; // gives 100 BPM at game start
 
+// Imune cell spawn limits
 const MACROPHAGE_BASE = 2;
-const MACROPHAGE_MAX  = 7;
+const MACROPHAGE_MAX  = 10;
+const NPHIL_MAX = 6;
+const NPHIL_MINTERVAL = 2;
+const ABODY_MAXINTERVAL = 20;
+const ABODY_REDUCTION = 18;
 // Tritone substitutions for player chord notes C4, E4, G4 (F#4, Bb4, C#5)
 const ANTIBODY_FREQS = [369.99, 466.16, 554.37];
+
+// Adaptation moderations compared to BPM
+const ADAPTATION_MODERATION = 300;
 
 // Roughness threshold for chord mutation on infection (stricter than INFECTION_THRESHOLD)
 const MUTATION_THRESHOLD = 0.1;
@@ -645,14 +653,14 @@ function loop(ts) {
     const rivalFocus = allRivalClones.length / Math.max(1, clones.length + allRivalClones.length);
     if (tcellAdaptKnownChord !== null && tcellAdaptKnownChord !== chordKey) { tcellAdaptation = 0; tcellRivalAdaptation = 0; }
     tcellAdaptKnownChord = chordKey;
-    const tBase = baseBpmRate / 120 * (tcellEvading ? 3 : 1);
+    const tBase = baseBpmRate / ADAPTATION_MODERATION * (tcellEvading ? 3 : 1);
     tcellAdaptation      = Math.min(1, tcellAdaptation      + tBase * (1 - rivalFocus));
     tcellRivalAdaptation = Math.min(1, tcellRivalAdaptation + tBase * rivalFocus * 1.2);
     if (rivalFocus > 0.5) tcellAdaptation      = Math.max(0, tcellAdaptation      - tBase * 0.4);
     else                  tcellRivalAdaptation = Math.max(0, tcellRivalAdaptation - tBase * 0.4);
     if (bcellAdaptKnownChord !== null && bcellAdaptKnownChord !== chordKey) { bcellAdaptation = 0; bcellRivalAdaptation = 0; }
     bcellAdaptKnownChord = chordKey;
-    const bBase = baseBpmRate / 120 * (bcellFleeing ? 3 : 1);
+    const bBase = baseBpmRate / ADAPTATION_MODERATION * (bcellFleeing ? 3 : 1);
     bcellAdaptation      = Math.min(1, bcellAdaptation      + bBase * (1 - rivalFocus));
     bcellRivalAdaptation = Math.min(1, bcellRivalAdaptation + bBase * rivalFocus * 1.2);
     if (rivalFocus > 0.5) bcellAdaptation      = Math.max(0, bcellAdaptation      - bBase * 0.4);
@@ -780,8 +788,8 @@ function loop(ts) {
   // Neutrophils: spawn interval driven by immune alert spikes; adaptation sets the max-count ceiling
   neutrophils = neutrophils.filter(n => !n.dead);
   nphilSpawnTimer = Math.max(0, nphilSpawnTimer - dt);
-  const nphilMaxCount      = Math.floor(tcellAdaptation * 4) + 1;          // 1 → 5 as T-cells adapt
-  const nphilSpawnInterval = Math.max(2, 20 - bcellAdaptation * 18);      // 20s → 3s as B-cells adapt
+  const nphilMaxCount      = Math.floor(tcellAdaptation * NPHIL_MAX) + 1;          // 1 → 5 as T-cells adapt
+  const nphilSpawnInterval = Math.max(NPHIL_MINTERVAL, 20 - bcellAdaptation * 18);      // 20s → 3s as B-cells adapt
   if (neutrophils.length < nphilMaxCount && (clones.length > 0 || (allRivalClones.length > 0 && bcellRivalAdaptation > 0.3)) && nphilSpawnTimer <= 0) {
     neutrophils.push(new Neutrophil(...randomEdgePos()));
     nphilSpawnTimer = nphilSpawnInterval;
@@ -872,7 +880,7 @@ function loop(ts) {
         && antibodies.filter(ab => !ab.attached).length < 2) {
       const noteIdx = Math.floor(Math.random() * 3);
       antibodies.push(new Antibody(bc.x, bc.y, noteIdx, ANTIBODY_FREQS[noteIdx]));
-      bc.launchTimer = (18 - bcellAdaptation * 14) * (0.85 + Math.random() * 0.3);
+      bc.launchTimer = (ABODY_MAXINTERVAL - bcellAdaptation * ABODY_REDUCTION) * (0.85 + Math.random() * 0.3);
     }
     // Player can neutralise B-cell by matching a corner note
     if (Math.hypot(bc.x - player.x, bc.y - player.y) < bc.radius + player.radius) {
@@ -894,12 +902,14 @@ function loop(ts) {
     if (!ab.attached && Math.hypot(ab.x - player.x, ab.y - player.y) < ab.radius + player.radius) {
       ab.attached = true;
       ab.attachAngle = Math.atan2(ab.y - player.y, ab.x - player.x);
+      player.drag += ab.attachDrag;
       player.chord[ab.targetNoteIdx] = ANTIBODY_FREQS[ab.targetNoteIdx];
       playAntibodyAttach();
     }
     if (ab.attached && hardShake) {
       player.chord[ab.targetNoteIdx] = player.baseChord[ab.targetNoteIdx];
       antibodies.splice(i, 1);
+      player.drag -= ab.attachDrag;
       proteinDetachSound();
     } else if (!ab.attached && Math.hypot(ab.x - player.x, ab.y - player.y) > 1500) {
       antibodies.splice(i, 1); // strayed too far
