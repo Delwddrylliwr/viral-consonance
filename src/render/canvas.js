@@ -249,6 +249,56 @@ export function drawGlow(ctx, player, cell, roughness) {
   ctx.restore();
 }
 
+// Control point for a quadratic curve from (x1,y1) to (x2,y2), bowed perpendicular to the
+// segment by `sign` (+1/-1) so a shared sign across segments reads as one continuous arc.
+function bowControl(x1, y1, x2, y2, sign) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.hypot(dx, dy) || 1;
+  const bow = len * 0.18 * sign;
+  return { x: (x1 + x2) / 2 - (dy / len) * bow, y: (y1 + y2) / 2 + (dx / len) * bow };
+}
+
+// Dotted signal line: T-cell -> macrophage it rallied -> player, shown only once that
+// macrophage is actively hunting the player -- makes the orchestrated hunt (entities.js) visible.
+// Curves bow away from the player rather than cutting straight through the space near them.
+export function drawOrchestrationLinks(ctx, tcells, macrophages, player, now) {
+  for (const m of macrophages) {
+    if (m.orchestrationAlpha <= 0.01) continue;
+    const tc = m.orchestrator;
+    if (!tc || !tcells.includes(tc)) continue;
+
+    // Pick the bow handedness once, away from the player, then reuse it for both segments
+    // so the T-cell -> macrophage -> player path reads as a single continuous arc.
+    const midX = (tc.x + m.x) / 2, midY = (tc.y + m.y) / 2;
+    const segDx = m.x - tc.x, segDy = m.y - tc.y;
+    const segLen = Math.hypot(segDx, segDy) || 1;
+    const perpX = -segDy / segLen, perpY = segDx / segLen;
+    const towardPlayerX = player.x - midX, towardPlayerY = player.y - midY;
+    const sign = (perpX * towardPlayerX + perpY * towardPlayerY) > 0 ? -1 : 1;
+
+    const pulse = 0.35 + 0.15 * Math.sin(now * 4);
+    ctx.save();
+    ctx.setLineDash([6, 7]);
+    ctx.lineDashOffset = -now * 60; // marching dashes flow T-cell -> macrophage -> player
+    ctx.strokeStyle = `rgba(190, 90, 255, ${m.orchestrationAlpha * pulse})`;
+    ctx.lineWidth = 1.5;
+
+    const c1 = bowControl(tc.x, tc.y, m.x, m.y, sign);
+    ctx.beginPath();
+    ctx.moveTo(tc.x, tc.y);
+    ctx.quadraticCurveTo(c1.x, c1.y, m.x, m.y);
+    ctx.stroke();
+
+    const c2 = bowControl(m.x, m.y, player.x, player.y, sign);
+    ctx.beginPath();
+    ctx.moveTo(m.x, m.y);
+    ctx.quadraticCurveTo(c2.x, c2.y, player.x, player.y);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+}
+
 export function drawProtein(ctx, protein, player) {
   const color = protein.attached ? '#f55' : '#f93';
 

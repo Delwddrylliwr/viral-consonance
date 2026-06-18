@@ -1,6 +1,6 @@
 import { initCanvas, clear, drawPlayer, drawCell, drawGlow, drawInfectionFlash, drawProtein, drawClone,
          drawMacrophage, drawTCell, drawAntibody, drawNeutrophil, drawLetterBond, drawBCell,
-         drawNeutrophilBlast, drawDangerBorder,
+         drawNeutrophilBlast, drawDangerBorder, drawOrchestrationLinks,
          drawBacterium, drawRivalVirus, drawRivalClone } from './src/render/canvas.js';
 import { state } from './src/game/state.js';
 import { startTransport, onBeat, getBPM, setTempo } from './src/audio/transport.js';
@@ -686,7 +686,8 @@ function loop(ts) {
         // Rally nearby macrophages to converge on the T-cell's position
         for (const m of macrophages) {
           if (!m.eatingPlayer && !m.targetingPlayer) {
-            m.rallyPoint = { x: tc.x, y: tc.y };
+            m.rallyPoint   = { x: tc.x, y: tc.y };
+            m.orchestrator = tc;
           }
         }
         break;
@@ -720,6 +721,11 @@ function loop(ts) {
   for (const m of macrophages) {
     m.update(dt, clones, beatPhase, player, attachmentDissonance, tcellAdaptation,
              allRivalClones, bacteria.filter(b => b.active), tcellRivalAdaptation);
+
+    // Fade the orchestration arc in when this macrophage is targeting the player under T-cell
+    // direction, fade it out otherwise — 0.4 s ramp each way.
+    const isOrchestrated = m.targetingPlayer && !!m.orchestrator && tcells.includes(m.orchestrator);
+    m.orchestrationAlpha = Math.min(1, Math.max(0, m.orchestrationAlpha + (isOrchestrated ? dt : -dt) * 2.5));
 
     // Macrophage eats player: contact starts a 2s eat window; shake to escape
     if (m.targetingPlayer && !m.eatingPlayer
@@ -1048,6 +1054,7 @@ function loop(ts) {
   }
   for (const c of clones) drawClone(ctx, c);
   for (const b of blasts) drawNeutrophilBlast(ctx, b);
+  drawOrchestrationLinks(ctx, tcells, macrophages, player, now);
   for (const m of macrophages) drawMacrophage(ctx, m, now, immuneAlertLevel);
   for (const tc of tcells) {
     const pn = player.getActiveNote(tc.x, tc.y);

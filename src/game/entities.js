@@ -540,6 +540,8 @@ export class Macrophage {
     this.dead            = false;
     this.burstTimer      = 0;
     this.rallyPoint      = null; // {x,y} — rush here before resuming normal behaviour
+    this.orchestrator      = null; // TCell that rallied this macrophage — drawn as a dotted link
+    this.orchestrationAlpha = 0;  // 0→1, eased each frame so the arc fades in/out smoothly
   }
 
   update(dt, clones, beatPhase, player, playerDissonance, tcellAdaptation, rivalClonePool = [], bacteria = [], tcellRivalAdaptation = 0) {
@@ -649,6 +651,7 @@ export class Macrophage {
     this.capturedClones.push({ rx: Math.cos(angle) * r, ry: Math.sin(angle) * r });
     this.target = null;
     this.retargetTimer = 0;
+    this.orchestrator = null;
     this.consumeCount++;
     if (this.consumeCount >= this.maxConsumes) this.dead = true;
   }
@@ -891,7 +894,7 @@ export class BCell {
     this.flashTimer  = 0;
     this.launchTimer = 8 + Math.random() * 6; // time until first antibody launch
     this.speed       = 60;   // slow enough to be catchable
-    this.fleeSpeed   = 100;   // faster when player is close
+    this.fleeSpeed   = 125;   // faster when player is close
     this.color       = '#a3f';
     // 8-note motif at octagon corners (based on antibody freq harmonics)
     this.motif = [369.99, 392.00, 415.30, 440.00, 466.16, 493.88, 523.25, 554.37];
