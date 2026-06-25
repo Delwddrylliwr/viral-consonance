@@ -94,8 +94,8 @@ let nextStrainIdx;    // which RIVAL_DEFS entry to introduce next
 let antibodySpawnTimer  = 15;
 let tcellRespawnTimer   = 0;
 let immuneAlertLevel = 0;
-let tcellAdaptation      = 0; // 0→1, grows ∝ BPM, resets on chord mutation
-let bcellAdaptation      = 0; // grows with BPM/clone-load; caps n-phil max and gates a-body launches
+let tcellAdaptation      = 0; // unbounded; grows ∝ BPM, resets on chord mutation
+let bcellAdaptation      = 0; // unbounded; logarithmically scales spawn pressure and antibody rate
 let tcellRivalAdaptation = 0; // T-cell focus redirected to rivals when rival clones dominate
 let bcellRivalAdaptation = 0; // B-cell focus redirected to rivals when rival clones dominate
 let tcellAdaptKnownChord = null;
@@ -640,15 +640,15 @@ function loop(ts) {
     if (tcellAdaptKnownChord !== null && tcellAdaptKnownChord !== chordKey) { tcellAdaptation = 0; tcellRivalAdaptation = 0; }
     tcellAdaptKnownChord = chordKey;
     const tBase = baseBpmRate / 120 * (tcellEvading ? 3 : 1);
-    tcellAdaptation      = Math.min(1, tcellAdaptation      + tBase * (1 - rivalFocus));
-    tcellRivalAdaptation = Math.min(1, tcellRivalAdaptation + tBase * rivalFocus * 1.2);
+    tcellAdaptation      += tBase * (1 - rivalFocus);
+    tcellRivalAdaptation += tBase * rivalFocus * 1.2;
     if (rivalFocus > 0.5) tcellAdaptation      = Math.max(0, tcellAdaptation      - tBase * 0.4);
     else                  tcellRivalAdaptation = Math.max(0, tcellRivalAdaptation - tBase * 0.4);
     if (bcellAdaptKnownChord !== null && bcellAdaptKnownChord !== chordKey) { bcellAdaptation = 0; bcellRivalAdaptation = 0; }
     bcellAdaptKnownChord = chordKey;
     const bBase = baseBpmRate / 120 * (bcellFleeing ? 3 : 1);
-    bcellAdaptation      = Math.min(1, bcellAdaptation      + bBase * (1 - rivalFocus));
-    bcellRivalAdaptation = Math.min(1, bcellRivalAdaptation + bBase * rivalFocus * 1.2);
+    bcellAdaptation      += bBase * (1 - rivalFocus);
+    bcellRivalAdaptation += bBase * rivalFocus * 1.2;
     if (rivalFocus > 0.5) bcellAdaptation      = Math.max(0, bcellAdaptation      - bBase * 0.4);
     else                  bcellRivalAdaptation = Math.max(0, bcellRivalAdaptation - bBase * 0.4);
   }
@@ -774,8 +774,12 @@ function loop(ts) {
   // Neutrophils: spawn interval driven by immune alert spikes; adaptation sets the max-count ceiling
   neutrophils = neutrophils.filter(n => !n.dead);
   nphilSpawnTimer = Math.max(0, nphilSpawnTimer - dt);
-  const nphilMaxCount      = Math.floor(tcellAdaptation * 4) + 1;          // 1 → 5 as T-cells adapt
-  const nphilSpawnInterval = Math.max(2, 20 - bcellAdaptation * 18);      // 20s → 3s as B-cells adapt
+  // Log-scaled: normalised so raw=1 gives same result as the old linear formula at its cap,
+  // but raw values keep growing past 1, producing ever-increasing pressure with no hard ceiling.
+  const _logT = Math.log(1 + tcellAdaptation * 4) / Math.log(5); // 0→∞, equals 1 when raw=1
+  const _logB = Math.log(1 + bcellAdaptation * 4) / Math.log(5);
+  const nphilMaxCount      = Math.floor(_logT * 4) + 1;           // raw=1 → 5; raw=5 → ~8; raw=10 → ~10+
+  const nphilSpawnInterval = Math.max(0.4, 20 / (1 + _logB * 8)); // raw=1 → ~2.2s; raw=5 → ~1.3s
   if (neutrophils.length < nphilMaxCount && (clones.length > 0 || (allRivalClones.length > 0 && bcellRivalAdaptation > 0.3)) && nphilSpawnTimer <= 0) {
     neutrophils.push(new Neutrophil(...randomEdgePos()));
     nphilSpawnTimer = nphilSpawnInterval;
@@ -848,7 +852,7 @@ function loop(ts) {
         && antibodies.filter(ab => !ab.attached).length < 2) {
       const noteIdx = Math.floor(Math.random() * 3);
       antibodies.push(new Antibody(bc.x, bc.y, noteIdx, ANTIBODY_FREQS[noteIdx]));
-      bc.launchTimer = (18 - bcellAdaptation * 14) * (0.85 + Math.random() * 0.3);
+      bc.launchTimer = (18 / (1 + Math.log(1 + bcellAdaptation * 4) / Math.log(5) * 7)) * (0.85 + Math.random() * 0.3);
     }
     // Player can neutralise B-cell by matching a corner note
     if (Math.hypot(bc.x - player.x, bc.y - player.y) < bc.radius + player.radius) {

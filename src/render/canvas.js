@@ -456,7 +456,7 @@ export function drawTCell(ctx, tc, matchable = false, immuneAlert = 0, tcellAdap
   const r = s * 0.48;
   ctx.lineWidth = 1.5;
   if (tcellAdaptation > 0.05) {
-    ctx.globalAlpha = tcellAdaptation * 0.6 * (1 - tcellRivalAdaptation);
+    ctx.globalAlpha = Math.min(1, tcellAdaptation) * 0.6 * Math.max(0, 1 - Math.min(1, tcellRivalAdaptation));
     ctx.strokeStyle = `hsl(${hue}, 90%, 68%)`;
     ctx.beginPath();
     for (let i = 0; i < 3; i++) {
@@ -487,8 +487,8 @@ export function drawTCell(ctx, tc, matchable = false, immuneAlert = 0, tcellAdap
     ctx.globalAlpha = 0.75;
     ctx.beginPath();
     ctx.arc(tc.x, tc.y, tc.radius * Math.SQRT2 + 7, -Math.PI / 2,
-            -Math.PI / 2 + tcellAdaptation * Math.PI * 2);
-    ctx.strokeStyle = `hsl(${80 - tcellAdaptation * 80}, 100%, 60%)`;
+            -Math.PI / 2 + Math.min(1, tcellAdaptation) * Math.PI * 2);
+    ctx.strokeStyle = `hsl(${80 - Math.min(1, tcellAdaptation) * 80}, 100%, 60%)`;
     ctx.lineWidth = 2.5;
     ctx.stroke();
     ctx.restore();

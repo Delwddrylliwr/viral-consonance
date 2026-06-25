@@ -544,7 +544,7 @@ export class Macrophage {
 
   update(dt, clones, beatPhase, player, playerDissonance, tcellAdaptation, rivalClonePool = [], bacteria = [], tcellRivalAdaptation = 0) {
     this.burstTimer = Math.max(0, this.burstTimer - dt);
-    const adaptedSpeed = this.speed * (1 + (tcellAdaptation || 0)); // up to 2× at full adaptation
+    const adaptedSpeed = this.speed * (1 + Math.log(1 + (tcellAdaptation || 0)) / Math.log(2)); // 2× at raw=1, keeps growing
     const spd = this.burstTimer > 0 ? adaptedSpeed * 1.8 : adaptedSpeed;
     if (this.eatingPlayer && player) {
       this.x = player.x;
@@ -570,7 +570,7 @@ export class Macrophage {
       const dissonance = playerDissonance || 0;
       const adaptation = tcellAdaptation || 0;
       // Probability of targeting player scales directly with player dissonance (complement + antibodies)
-      if (player && Math.random() < dissonance + 0.5 * adaptation) {
+      if (player && Math.random() < dissonance + 0.5 * Math.log(1 + adaptation) / Math.log(2)) {
         this.targetingPlayer  = true;
         this.target           = null;
         this.distractedTarget = null;
@@ -602,8 +602,8 @@ export class Macrophage {
           }
         }
       }
-      // Retarget interval: increases as T-cells adapt (3s → 0.5s); player dissonance slows it down further
-      const baseInterval   = adaptation * 3.0;
+      // Retarget interval: macrophages commit longer to their target as adaptation grows; unbounded
+      const baseInterval   = Math.log(1 + adaptation) / Math.log(2) * 3.0;
       const dissonanceBoost = 0.5 + dissonance * 0.5;
       this.retargetTimer = Math.max(0.3, baseInterval * dissonanceBoost + (Math.random() - 0.5) * 0.4);
     }
