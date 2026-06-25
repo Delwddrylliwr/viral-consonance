@@ -453,10 +453,14 @@ export function drawTCell(ctx, tc, matchable = false, immuneAlert = 0, tcellAdap
     : `hsla(${hue}, ${sat}%, ${light}%, ${fillAlpha})`;
   ctx.fill();
   // Interior shapes: triangle = player focus, hexagon = rival focus; crossfade as adaptation shifts
+  // Asymptotic visual normalization — maps [0,∞) → [0,1); grows fast at first, decelerates,
+  // never completes, mirroring the unbounded raw values while keeping alpha/arc in valid range.
+  const tAdaptVis = tcellAdaptation       / (tcellAdaptation       + 0.5);
+  const tRivalVis = tcellRivalAdaptation  / (tcellRivalAdaptation  + 0.5);
   const r = s * 0.48;
   ctx.lineWidth = 1.5;
   if (tcellAdaptation > 0.05) {
-    ctx.globalAlpha = Math.min(1, tcellAdaptation) * 0.6 * Math.max(0, 1 - Math.min(1, tcellRivalAdaptation));
+    ctx.globalAlpha = tAdaptVis * 0.6 * (1 - tRivalVis);
     ctx.strokeStyle = `hsl(${hue}, 90%, 68%)`;
     ctx.beginPath();
     for (let i = 0; i < 3; i++) {
@@ -468,7 +472,7 @@ export function drawTCell(ctx, tc, matchable = false, immuneAlert = 0, tcellAdap
     ctx.stroke();
   }
   if (tcellRivalAdaptation > 0.05) {
-    ctx.globalAlpha = tcellRivalAdaptation * 0.65;
+    ctx.globalAlpha = tRivalVis * 0.65;
     ctx.strokeStyle = '#f80';
     ctx.beginPath();
     for (let i = 0; i < 6; i++) {
@@ -487,8 +491,8 @@ export function drawTCell(ctx, tc, matchable = false, immuneAlert = 0, tcellAdap
     ctx.globalAlpha = 0.75;
     ctx.beginPath();
     ctx.arc(tc.x, tc.y, tc.radius * Math.SQRT2 + 7, -Math.PI / 2,
-            -Math.PI / 2 + Math.min(1, tcellAdaptation) * Math.PI * 2);
-    ctx.strokeStyle = `hsl(${80 - Math.min(1, tcellAdaptation) * 80}, 100%, 60%)`;
+            -Math.PI / 2 + tAdaptVis * Math.PI * 2);
+    ctx.strokeStyle = `hsl(${80 - tAdaptVis * 80}, 100%, 60%)`;
     ctx.lineWidth = 2.5;
     ctx.stroke();
     ctx.restore();

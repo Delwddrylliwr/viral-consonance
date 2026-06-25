@@ -870,6 +870,7 @@ function loop(ts) {
 
   for (let i = antibodies.length - 1; i >= 0; i--) {
     const ab = antibodies[i];
+    ab.maxSpeed = 240 * (1 + _logB * 0.5); // grows from 240 px/s; raw=1 → 360; unbounded
     ab.update(dt, player);
     if (!ab.attached && Math.hypot(ab.x - player.x, ab.y - player.y) < ab.radius + player.radius) {
       ab.attached = true;
