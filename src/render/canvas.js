@@ -658,16 +658,22 @@ export function drawNeutrophilBlast(ctx, blast) {
   const progress  = blast.maxRadius > 0 ? blast.radius / blast.maxRadius : 1;
   const alpha     = Math.max(0, 0.9 - progress * 0.85);
   const lineWidth = 2 + (1 - progress) * 10;
+  const r = Math.max(1, blast.radius);
   ctx.save();
   ctx.translate(blast.x, blast.y);
-  ctx.shadowColor = '#ff8800';
-  ctx.shadowBlur  = 24;
+  // Faux-glow: a wide, faint outer stroke stands in for shadowBlur, which is a
+  // full-bounding-box Gaussian blur — far too costly for a large expanding ring
+  // on software-rasterized canvases (e.g. Raspberry Pi 5 / Chromium).
   ctx.beginPath();
-  ctx.arc(0, 0, Math.max(1, blast.radius), 0, Math.PI * 2);
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.strokeStyle = `rgba(255, 136, 0, ${alpha * 0.25})`;
+  ctx.lineWidth   = lineWidth * 3;
+  ctx.stroke();
+  // Core ring
   ctx.strokeStyle = `rgba(255, 140, 20, ${alpha})`;
   ctx.lineWidth   = lineWidth;
   ctx.stroke();
-  ctx.shadowBlur  = 8;
+  // Bright inner highlight
   ctx.strokeStyle = `rgba(255, 240, 120, ${alpha * 0.55})`;
   ctx.lineWidth   = lineWidth * 0.35;
   ctx.stroke();
@@ -684,10 +690,20 @@ export function drawDangerBorder(ctx, intensity, now) {
   const pad   = 35;
   ctx.save();
   ctx.globalAlpha  = alpha;
-  ctx.shadowColor  = '#cc0000';
-  ctx.shadowBlur   = 100;
-  ctx.strokeStyle  = '#660000';
-  ctx.lineWidth    = pad * 2;
-  ctx.strokeRect(-pad, -pad, w + pad * 2, h + pad * 2);
+  // Faux-glow: layered translucent rects fake the inward red bleed that
+  // shadowBlur = 100 used to produce. A full-screen shadow blur is one of the
+  // most expensive canvas ops on software-rasterized targets (Pi 5 / Chromium),
+  // so we approximate it with a few cheap wider strokes instead.
+  const glow = [
+    { lw: pad * 5.0, a: 0.18, color: '204, 0, 0' },
+    { lw: pad * 3.4, a: 0.30, color: '204, 0, 0' },
+    { lw: pad * 2.0, a: 1.00, color: '102, 0, 0' },
+  ];
+  for (const g of glow) {
+    ctx.globalAlpha = alpha * g.a;
+    ctx.strokeStyle = `rgb(${g.color})`;
+    ctx.lineWidth   = g.lw;
+    ctx.strokeRect(-pad, -pad, w + pad * 2, h + pad * 2);
+  }
   ctx.restore();
 }
