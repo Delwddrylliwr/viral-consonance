@@ -382,8 +382,11 @@ function triggerDeath() {
   deathSequence(() => { deathFade = 1; });
 }
 
-// Click/tap-to-start
-document.getElementById('start').addEventListener('click', async () => {
+// Click/tap/key-to-start
+let starting = false;
+async function startGame() {
+  if (starting) return; // guard against double-fire (e.g. click + key)
+  starting = true;
   const startEl = document.getElementById('start');
   const span = startEl.querySelector('span');
   try {
@@ -396,12 +399,22 @@ document.getElementById('start').addEventListener('click', async () => {
     startTransport(BASE_BPM);
     init();
     startEl.remove();
+    window.removeEventListener('keydown', startOnKey);
     requestAnimationFrame(loop);
   } catch (err) {
     span.textContent = err.message;
     console.error('Start failed:', err);
+    starting = false; // allow retry
   }
-});
+}
+function startOnKey(e) {
+  // ignore modifier-only presses so shortcuts (e.g. Ctrl+R) don't launch the game
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  e.preventDefault();
+  startGame();
+}
+document.getElementById('start').addEventListener('click', startGame);
+window.addEventListener('keydown', startOnKey);
 
 // Restart after death
 window.addEventListener('pointerdown', () => {
