@@ -416,9 +416,18 @@ function startOnKey(e) {
 document.getElementById('start').addEventListener('click', startGame);
 window.addEventListener('keydown', startOnKey);
 
-// Restart after death
-window.addEventListener('pointerdown', () => {
+// Restart after death — via pointer or key press
+function restartIfReady() {
   if (dead && deathFade >= 1 && !showingNameInput && finalLeaderboard !== null) location.reload();
+}
+window.addEventListener('pointerdown', restartIfReady);
+window.addEventListener('keydown', e => {
+  // ignore modifier combos (e.g. Ctrl+R) so they keep their normal behaviour
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (dead && deathFade >= 1 && !showingNameInput && finalLeaderboard !== null) {
+    e.preventDefault();
+    restartIfReady();
+  }
 });
 
 let last = 0;
@@ -492,11 +501,11 @@ function loop(ts) {
         ctx.textAlign = 'center';
         ctx.font      = '13px monospace';
         ctx.fillStyle = '#444';
-        ctx.fillText('click to restart', cx, cy + 40 + finalLeaderboard.length * 15);
+        ctx.fillText('click or press any key to restart', cx, cy + 40 + finalLeaderboard.length * 15);
       } else if (finalLeaderboard !== null && !showingNameInput) {
         ctx.font      = '15px monospace';
         ctx.fillStyle = '#444';
-        ctx.fillText('click to restart', cx, cy + 18);
+        ctx.fillText('click or press any key to restart', cx, cy + 18);
       }
 
       ctx.restore();
