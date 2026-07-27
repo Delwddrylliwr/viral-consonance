@@ -1,6 +1,6 @@
 import { initCanvas, clear, drawPlayer, drawCell, drawGlow, drawInfectionFlash, drawProtein, drawClone,
          drawMacrophage, drawTCell, drawAntibody, drawNeutrophil, drawLetterBond, drawBCell,
-         drawNeutrophilBlast, drawDangerBorder,
+         drawNeutrophilBlast, drawDangerBorder, drawPerfOverlay,
          drawBacterium, drawRivalVirus, drawRivalClone } from './src/render/canvas.js';
 import { state } from './src/game/state.js';
 import { startTransport, onBeat, getBPM, setTempo } from './src/audio/transport.js';
@@ -20,6 +20,19 @@ import { checkContact, bouncePlayer, spawnCell, INFECTION_THRESHOLD,
 
 const canvas = initCanvas();
 const ctx    = canvas.getContext('2d');
+
+// ── Rendering quality governor ────────────────────────────────────────────
+// Low-power targets (e.g. Raspberry Pi 5 / Chromium) can't afford the full
+// blast/danger-border glow work every frame. Rather than force one setting, we
+// measure frame time and drop to a cheaper render path when we're running slow,
+// restoring full quality when there's headroom. URL flags override the auto path:
+//   ?lowfx  force the cheap path   ?hifx  force full quality   ?debug  show overlay
+const _params    = new URLSearchParams(location.search);
+const FORCE_LOWFX = _params.has('lowfx');
+const FORCE_HIFX  = _params.has('hifx');
+const SHOW_PERF   = _params.has('debug') || _params.has('fps');
+state.lowFX = FORCE_LOWFX; // adaptive path may flip this each frame
+state.frameMs = 16.7;      // EMA of real frame interval, seeded at 60fps
 
 // Keyboard input
 const input = { up: false, down: false, left: false, right: false };
@@ -433,8 +446,16 @@ window.addEventListener('keydown', e => {
 let last = 0;
 function loop(ts) {
   const now = ts / 1000;
+  const rawMs = last > 0 ? Math.min(ts - last, 100) : 16.7; // clamp tab-switch spikes
   const dt  = Math.min((ts - last) / 1000, 0.05);
   last = ts;
+
+  // Smooth the frame interval and pick a quality tier (hysteresis avoids flip-flop).
+  state.frameMs = state.frameMs * 0.9 + rawMs * 0.1;
+  if (FORCE_LOWFX)       state.lowFX = true;
+  else if (FORCE_HIFX)   state.lowFX = false;
+  else if (state.frameMs > 22) state.lowFX = true;   // sustained < ~45fps → cheap path
+  else if (state.frameMs < 18) state.lowFX = false;  // recovered > ~55fps → full path
 
   if (dead) {
     deathFade = Math.min(1, deathFade + dt / 4);
@@ -1035,7 +1056,7 @@ function loop(ts) {
     drawCell(ctx, c, cActiveFreq, cellAlpha);
   }
   for (const c of clones) drawClone(ctx, c);
-  for (const b of blasts) drawNeutrophilBlast(ctx, b);
+  for (const b of blasts) drawNeutrophilBlast(ctx, b, state.lowFX);
   for (const m of macrophages) drawMacrophage(ctx, m, now, immuneAlertLevel);
   for (const tc of tcells) {
     const pn = player.getActiveNote(tc.x, tc.y);
@@ -1058,7 +1079,7 @@ function loop(ts) {
   const eatDanger  = macrophages.some(m => m.eatingPlayer) ? 1 : 0;
   const blastDanger  = blasts.some(b => !b.dead && Math.hypot(b.x - player.x, b.y - player.y) <= b.maxRadius) ? 1 : 0;
   const dangerIntensity = Math.max(bpmDanger, latchDanger, blastDanger, eatDanger);
-  drawDangerBorder(ctx, dangerIntensity, now);
+  drawDangerBorder(ctx, dangerIntensity, now, state.lowFX);
 
   if (mutationHintTimer > 0) {
     mutationHintTimer = Math.max(0, mutationHintTimer - dt);
@@ -1069,6 +1090,20 @@ function loop(ts) {
     ctx.textAlign = 'center';
     ctx.fillText('chord mutated — viral spread still accumulating', canvas.width / 2, 28);
     ctx.restore();
+  }
+
+  if (SHOW_PERF) {
+    drawPerfOverlay(ctx, {
+      fps: 1000 / state.frameMs,
+      ms: state.frameMs,
+      lowFX: state.lowFX,
+      blasts: blasts.length,
+      neutrophils: neutrophils.length,
+      macrophages: macrophages.length,
+      tcells: tcells.length,
+      cells: cells.filter(c => c.active).length,
+      clones: clones.length,
+    });
   }
 
   requestAnimationFrame(loop);

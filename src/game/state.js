@@ -17,4 +17,6 @@ export const state = {
   bcellFamiliarity: 0,
   dead: false,
   rpmMultiplier: 1,
+  lowFX: false,   // true → cheaper render path (set by the quality governor in main.js)
+  frameMs: 16.7,  // smoothed real frame interval, ms
 };

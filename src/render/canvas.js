@@ -654,18 +654,29 @@ export function drawNeutrophil(ctx, n, immuneAlert = 0) {
   ctx.restore();
 }
 
-export function drawNeutrophilBlast(ctx, blast) {
+export function drawNeutrophilBlast(ctx, blast, lowFX = false) {
   const progress  = blast.maxRadius > 0 ? blast.radius / blast.maxRadius : 1;
   const alpha     = Math.max(0, 0.9 - progress * 0.85);
   const lineWidth = 2 + (1 - progress) * 10;
   const r = Math.max(1, blast.radius);
   ctx.save();
   ctx.translate(blast.x, blast.y);
-  // Faux-glow: a wide, faint outer stroke stands in for shadowBlur, which is a
-  // full-bounding-box Gaussian blur — far too costly for a large expanding ring
-  // on software-rasterized canvases (e.g. Raspberry Pi 5 / Chromium).
   ctx.beginPath();
   ctx.arc(0, 0, r, 0, Math.PI * 2);
+
+  if (lowFX) {
+    // Low-FX path: a single stroked ring. The blast expands to ~500px radius,
+    // so every extra stroke rasterizes a large-circumference antialiased path —
+    // the dominant per-frame cost on software-rasterized canvases (Pi 5 / Chromium).
+    ctx.strokeStyle = `rgba(255, 150, 30, ${alpha})`;
+    ctx.lineWidth   = lineWidth;
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+
+  // Full-FX path: faux-glow via a wide faint outer stroke standing in for
+  // shadowBlur (a full-bounding-box Gaussian blur, far too costly here).
   ctx.strokeStyle = `rgba(255, 136, 0, ${alpha * 0.25})`;
   ctx.lineWidth   = lineWidth * 3;
   ctx.stroke();
@@ -680,7 +691,7 @@ export function drawNeutrophilBlast(ctx, blast) {
   ctx.restore();
 }
 
-export function drawDangerBorder(ctx, intensity, now) {
+export function drawDangerBorder(ctx, intensity, now, lowFX = false) {
   if (intensity <= 0) return;
   const w = ctx.canvas.width;
   const h = ctx.canvas.height;
@@ -689,11 +700,21 @@ export function drawDangerBorder(ctx, intensity, now) {
   const alpha = intensity * (0.3 + 0.55 * pulse);
   const pad   = 35;
   ctx.save();
-  ctx.globalAlpha  = alpha;
-  // Faux-glow: layered translucent rects fake the inward red bleed that
-  // shadowBlur = 100 used to produce. A full-screen shadow blur is one of the
-  // most expensive canvas ops on software-rasterized targets (Pi 5 / Chromium),
-  // so we approximate it with a few cheap wider strokes instead.
+
+  if (lowFX) {
+    // Low-FX path: one modest border stroke. The border is active for the whole
+    // time the player sits inside a blast radius, so the wide multi-layer glow
+    // band below is a large per-frame alpha fill we skip on low-power targets.
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = 'rgb(150, 0, 0)';
+    ctx.lineWidth   = pad * 2;
+    ctx.strokeRect(-pad, -pad, w + pad * 2, h + pad * 2);
+    ctx.restore();
+    return;
+  }
+
+  // Full-FX path: layered translucent rects fake the inward red bleed that
+  // shadowBlur = 100 used to produce, without the software Gaussian blur.
   const glow = [
     { lw: pad * 5.0, a: 0.18, color: '204, 0, 0' },
     { lw: pad * 3.4, a: 0.30, color: '204, 0, 0' },
@@ -705,5 +726,26 @@ export function drawDangerBorder(ctx, intensity, now) {
     ctx.lineWidth   = g.lw;
     ctx.strokeRect(-pad, -pad, w + pad * 2, h + pad * 2);
   }
+  ctx.restore();
+}
+
+// Lightweight frame-time / quality overlay (opt-in via ?debug). Deliberately
+// cheap: a handful of fillText lines, no per-entity work.
+export function drawPerfOverlay(ctx, info) {
+  const lines = [
+    `FPS:    ${info.fps.toFixed(0)}  (${info.ms.toFixed(1)} ms)`,
+    `QUALITY:${info.lowFX ? ' LOW-FX' : ' full'}`,
+    `BLASTS: ${info.blasts}`,
+    `N-PHIL: ${info.neutrophils}`,
+    `MACRO:  ${info.macrophages}`,
+    `TCELL:  ${info.tcells}`,
+    `CELLS:  ${info.cells}`,
+    `CLONES: ${info.clones}`,
+  ];
+  ctx.save();
+  ctx.font      = '12px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = info.fps < 45 ? '#ff6666' : '#66ff99';
+  lines.forEach((line, i) => ctx.fillText(line, 12, 20 + i * 15));
   ctx.restore();
 }
