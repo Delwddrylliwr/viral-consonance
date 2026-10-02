@@ -12,6 +12,7 @@ import { createPlayerVoice, createCellVoice, createCloneVoice, voiceCount,
   from './src/audio/synthesis.js';
 import { roughness, DEFAULT_TIMBRE } from './src/audio/consonance.js';
 import { PLAYER_CHORD } from './src/audio/scale.js';
+import { createInitials, applyAction, initialsName, CHARSET, SLOT_COUNT, END_SLOT } from './src/ui/initials.js';
 import { Player, Cell, Clone, Macrophage, TCell, Antibody, Neutrophil, BCell, NeutrophilBlast, angleDiff,
          Bacterium, RivalVirus, RivalClone, RIVAL_DEFS } from './src/game/entities.js';
 import { checkContact, bouncePlayer, spawnCell, INFECTION_THRESHOLD,
@@ -138,36 +139,122 @@ function calcScore() {
   return Math.round(cloneExpAccum);
 }
 
-function showNameInputOverlay() {
+// --- arcade initials entry (joystick / keys / tap) ---
+
+const NAME_ENTRY_TIMEOUT = 30; // seconds idle before auto-saving the current initials
+const MENU_KEYS = {
+  ...KEY_MAP,
+  // the usual arcade-encoder / MAME button keys all confirm
+  Enter: 'confirm', NumpadEnter: 'confirm', Space: 'confirm', Digit1: 'confirm',
+  ControlLeft: 'confirm', AltLeft: 'confirm', ShiftLeft: 'confirm', KeyZ: 'confirm', KeyX: 'confirm',
+};
+let nameEntry     = null;
+let nameEntryIdle = 0;
+const nameEntryKeys = new Set(); // keys first pressed during entry — only these may auto-repeat
+
+function startNameEntry() {
   showingNameInput = true;
-  const overlay = document.getElementById('name-input-overlay');
-  const input   = document.getElementById('name-input-field');
-  const btn     = document.getElementById('name-submit-btn');
-  overlay.style.display = 'flex';
-  input.value = '';
-  setTimeout(() => input.focus(), 50);
+  nameEntry        = createInitials();
+  nameEntryIdle    = 0;
+  nameEntryKeys.clear();
+}
 
-  async function submit() {
-    btn.disabled    = true;
-    btn.textContent = 'saving…';
-    try {
-      const res  = await fetch('/api/scores', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ name: input.value, score: calcScore() }),
-      });
-      const data = await res.json();
-      finalLeaderboard = data.scores;
-      newEntryIdx      = data.idx;
-    } catch {
-      finalLeaderboard = [];
-    }
-    overlay.style.display = 'none';
-    showingNameInput = false;
+function nameEntryAction(action) {
+  if (!nameEntry || nameEntry.done) return;
+  nameEntryIdle = 0;
+  applyAction(nameEntry, action);
+  if (nameEntry.done) submitName();
+}
+
+async function submitName() {
+  nameEntry.done = true;
+  try {
+    const res  = await fetch('/api/scores', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ name: initialsName(nameEntry), score: calcScore() }),
+    });
+    const data = await res.json();
+    finalLeaderboard = data.scores;
+    newEntryIdx      = data.idx;
+  } catch {
+    finalLeaderboard = [];
   }
+  showingNameInput = false;
+}
 
-  btn.onclick     = submit;
-  input.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } };
+window.addEventListener('keydown', e => {
+  if (!showingNameInput) return;
+  const action = MENU_KEYS[e.code];
+  if (!action) return;
+  e.preventDefault();
+  if (!e.repeat) nameEntryKeys.add(e.code);
+  // a direction held through the death fade must not scroll letters; holding a fresh up/down may
+  else if (!nameEntryKeys.has(e.code) || action === 'confirm') return;
+  nameEntryAction(action);
+});
+
+// Layout shared by drawing and tap hit-testing (offsets from the screen centre)
+const NE_SLOT_DX  = 34;
+const NE_END_DX   = 58;
+const NE_TOP      = 34;  // tap band above → letter up
+const NE_UP_BAND  = 56;
+const NE_DOWN_BAND = 88; // tap band below → letter down
+const NE_BOTTOM   = 108;
+const neSlotX = (cx, i) => i === END_SLOT ? cx + NE_END_DX : cx - 64 + i * NE_SLOT_DX;
+
+window.addEventListener('pointerdown', e => {
+  if (!showingNameInput || !nameEntry || nameEntry.done) return;
+  const cx = canvas.width / 2, cy = canvas.height / 2;
+  const y  = e.clientY - cy;
+  if (y < NE_TOP || y > NE_BOTTOM) return;
+  for (let i = 0; i <= END_SLOT; i++) {
+    const half = i === END_SLOT ? 26 : NE_SLOT_DX / 2;
+    if (Math.abs(e.clientX - neSlotX(cx, i)) > half) continue;
+    nameEntry.cursor = i;
+    nameEntryIdle    = 0;
+    if (i === END_SLOT)        nameEntryAction('confirm');
+    else if (y < NE_UP_BAND)   nameEntryAction('up');
+    else if (y > NE_DOWN_BAND) nameEntryAction('down');
+    return;
+  }
+});
+
+function drawNameEntry(cx, cy, dt) {
+  if (!nameEntry.done) {
+    nameEntryIdle += dt;
+    if (nameEntryIdle >= NAME_ENTRY_TIMEOUT) submitName();
+  }
+  ctx.textAlign = 'center';
+  ctx.font      = '12px monospace';
+  ctx.fillStyle = '#5af';
+  ctx.fillText('NEW TOP SCORE — ENTER YOUR INITIALS', cx, cy + 24);
+
+  for (let i = 0; i < SLOT_COUNT; i++) {
+    const x   = neSlotX(cx, i);
+    const sel = nameEntry.cursor === i;
+    ctx.font      = '12px monospace';
+    ctx.fillStyle = sel ? '#5af' : '#333';
+    ctx.fillText('▲', x, cy + 50);
+    ctx.fillText('▼', x, cy + 102);
+    ctx.font      = '30px monospace';
+    ctx.fillStyle = sel ? '#5af' : '#888';
+    ctx.fillText(CHARSET[nameEntry.chars[i]], x, cy + 82);
+    if (sel) ctx.fillRect(x - 11, cy + 88, 22, 2);
+  }
+  const endSel = nameEntry.cursor === END_SLOT;
+  ctx.font      = '16px monospace';
+  ctx.fillStyle = endSel ? '#5af' : '#666';
+  ctx.fillText('END', neSlotX(cx, END_SLOT), cy + 78);
+  if (endSel) ctx.fillRect(neSlotX(cx, END_SLOT) - 18, cy + 88, 36, 2);
+
+  ctx.font      = '11px monospace';
+  ctx.fillStyle = '#444';
+  ctx.fillText(nameEntry.done ? 'saving…' : '▲▼ letter · ◀▶ move · button to confirm', cx, cy + 126);
+  if (!nameEntry.done) {
+    ctx.fillStyle = '#333';
+    ctx.fillText(`auto-save in ${Math.ceil(NAME_ENTRY_TIMEOUT - nameEntryIdle)}s`, cx, cy + 142);
+  }
 }
 
 // --- helpers ---
@@ -424,6 +511,7 @@ window.addEventListener('pointerdown', restartIfReady);
 window.addEventListener('keydown', e => {
   // ignore modifier combos (e.g. Ctrl+R) so they keep their normal behaviour
   if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.repeat) return; // a key still held from confirming initials must not skip the scores
   if (dead && deathFade >= 1 && !showingNameInput && finalLeaderboard !== null) {
     e.preventDefault();
     restartIfReady();
@@ -460,7 +548,7 @@ function loop(ts) {
             && (scores.length < LEADERBOARD_SIZE
                 || score > (scores[scores.length - 1]?.score ?? -1));
           if (qualifies) {
-            showNameInputOverlay();
+            startNameEntry();
           } else {
             finalLeaderboard = scores;
           }
@@ -482,7 +570,9 @@ function loop(ts) {
       ctx.font = '20px monospace';
       ctx.fillText(`(peak ${maxViralLoad} virions · avg ${avgBpm} BPM)`, cx, cy - 2);
 
-      if (finalLeaderboard !== null && finalLeaderboard.length > 0) {
+      if (showingNameInput) {
+        drawNameEntry(cx, cy, dt);
+      } else if (finalLeaderboard !== null && finalLeaderboard.length > 0) {
         ctx.font = '12px monospace';
         ctx.fillStyle = '#555';
         ctx.fillText('top viral spreads', cx, cy + 22);

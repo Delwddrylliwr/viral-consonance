@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test tests/consonance.test.js"
+    "test": "node --test tests/consonance.test.js tests/initials.test.js"
   },
   "dependencies": {
     "@resvg/resvg-js": "^2.6.2",
