@@ -19,6 +19,11 @@ import { checkContact, bouncePlayer, spawnCell, INFECTION_THRESHOLD,
          checkContactProtein, spawnProtein, spawnBacterium }
   from './src/game/contact.js';
 
+// A slightly larger audio buffer than Tone's default ('interactive') so the audio thread
+// doesn't run dry and crackle when a Raspberry Pi is busy drawing a crowded screen.
+// Beat sounds are scheduled ahead on the transport, so only immediate one-shots get the extra latency.
+Tone.setContext(new Tone.Context({ latencyHint: 'balanced' }));
+
 const canvas = initCanvas();
 const ctx    = canvas.getContext('2d');
 
