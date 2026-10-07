@@ -100,9 +100,24 @@ export function resolutionCadence(contactNotes, playerChord) {
   }, 2000);
 }
 
-// Master volume tracks tempo: -18 dB at 60 BPM, reaches 0 dB at 160 BPM and stays there.
+// Master bus: compressor + brickwall limiter after the master volume stage.
+// Without this, overlapping voices sum past 0 dBFS at high tempo and hard-clip
+// in the DAC — heard as harsh, tinny distortion (worst on the Pi's analog out).
+let _masterBusReady = false;
+export function initMasterBus() {
+  if (_masterBusReady) return;
+  _masterBusReady = true;
+  const comp    = new Tone.Compressor({ threshold: -18, ratio: 3, attack: 0.01, release: 0.2 });
+  const limiter = new Tone.Limiter(-3);
+  Tone.getDestination().chain(comp, limiter);
+}
+
+// Master volume tracks tempo: -18 dB at 60 BPM, reaches MASTER_PEAK_DB at 160 BPM and stays there.
+// Peak sits below 0 dB to leave headroom for the many voices that stack up at high tempo.
+const MASTER_PEAK_DB = -6;
 export function setMasterVolume(bpm) {
-  const db = Math.min(0, -18 + ((bpm - 60) / 100) * 18);
+  const t  = Math.min(1, Math.max(0, (bpm - 60) / 100));
+  const db = -18 + t * (MASTER_PEAK_DB + 18);
   Tone.getDestination().volume.rampTo(db, 0.5);
 }
 
