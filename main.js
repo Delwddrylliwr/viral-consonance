@@ -6,7 +6,7 @@ import { state } from './src/game/state.js';
 import { startTransport, onBeat, getBPM, setTempo } from './src/audio/transport.js';
 import { createPlayerVoice, createCellVoice, createCloneVoice, voiceCount,
          resolutionCadence, dissonantStab, playMutationSound,
-         setMasterVolume, setChorusDepth, proteinAttachSound, proteinDetachSound, deathSequence,
+         setMasterVolume, setChorusDepth, initMasterBus, proteinAttachSound, proteinDetachSound, deathSequence,
          playMacrophageConsume, playMacrophageAttach, playAntibodyAttach, playNeutrophilTick, playNeutrophilExplode,
          scoreRevealSound }
   from './src/audio/synthesis.js';
@@ -483,6 +483,7 @@ async function startGame() {
       new Promise((_, rej) => setTimeout(() => rej(new Error('audio timeout — tap again')), 4000)),
     ]);
     span.textContent = 'loading…';
+    initMasterBus();
     startTransport(BASE_BPM);
     init();
     startEl.remove();
