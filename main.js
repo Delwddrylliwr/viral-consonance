@@ -19,8 +19,26 @@ import { checkContact, bouncePlayer, spawnCell, INFECTION_THRESHOLD,
          checkContactProtein, spawnProtein, spawnBacterium }
   from './src/game/contact.js';
 
+// A slightly larger audio buffer than Tone's default ('interactive') so the audio thread
+// doesn't run dry and crackle when a Raspberry Pi is busy drawing a crowded screen.
+// Beat sounds are scheduled ahead on the transport, so only immediate one-shots get the extra latency.
+Tone.setContext(new Tone.Context({ latencyHint: 'balanced' }));
+
 const canvas = initCanvas();
 const ctx    = canvas.getContext('2d');
+
+// Picade X HAT function buttons (default dtoverlay codes: Enter, Escape, Coin = I, Start = O)
+// plus the power key belong to the system — e.g. a hotkey back to EmulationStation.
+// Swallow them before any game handler sees them, without preventDefault, so they pass through.
+const SYSTEM_KEYS = new Set(['Enter', 'NumpadEnter', 'Escape', 'KeyI', 'KeyO', 'Power']);
+const blockSystemKeys = e => { if (SYSTEM_KEYS.has(e.code)) e.stopImmediatePropagation(); };
+window.addEventListener('keydown', blockSystemKeys, true);
+window.addEventListener('keyup',   blockSystemKeys, true);
+
+// A held modifier plus another key is a shortcut (e.g. Ctrl+R) — but the modifier on its own
+// is a game button (Picade buttons 1 and 2 are Left Ctrl and Left Alt).
+const MODIFIER_CODES = new Set(['ControlLeft', 'ControlRight', 'AltLeft', 'AltRight', 'MetaLeft', 'MetaRight']);
+const isShortcut = e => (e.ctrlKey || e.metaKey || e.altKey) && !MODIFIER_CODES.has(e.code);
 
 // Keyboard input
 const input = { up: false, down: false, left: false, right: false };
@@ -145,7 +163,7 @@ const NAME_ENTRY_TIMEOUT = 30; // seconds idle before auto-saving the current in
 const MENU_KEYS = {
   ...KEY_MAP,
   // the usual arcade-encoder / MAME button keys all confirm
-  Enter: 'confirm', NumpadEnter: 'confirm', Space: 'confirm', Digit1: 'confirm',
+  Space: 'confirm', Digit1: 'confirm',
   ControlLeft: 'confirm', AltLeft: 'confirm', ShiftLeft: 'confirm', KeyZ: 'confirm', KeyX: 'confirm',
 };
 let nameEntry     = null;
@@ -496,8 +514,8 @@ async function startGame() {
   }
 }
 function startOnKey(e) {
-  // ignore modifier-only presses so shortcuts (e.g. Ctrl+R) don't launch the game
-  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  // ignore shortcuts (e.g. Ctrl+R) so they don't launch the game
+  if (isShortcut(e)) return;
   e.preventDefault();
   startGame();
 }
@@ -510,8 +528,8 @@ function restartIfReady() {
 }
 window.addEventListener('pointerdown', restartIfReady);
 window.addEventListener('keydown', e => {
-  // ignore modifier combos (e.g. Ctrl+R) so they keep their normal behaviour
-  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  // ignore shortcuts (e.g. Ctrl+R) so they keep their normal behaviour
+  if (isShortcut(e)) return;
   if (e.repeat) return; // a key still held from confirming initials must not skip the scores
   if (dead && deathFade >= 1 && !showingNameInput && finalLeaderboard !== null) {
     e.preventDefault();

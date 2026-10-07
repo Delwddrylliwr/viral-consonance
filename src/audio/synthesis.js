@@ -74,7 +74,7 @@ export function createCellVoice() {
 
   return {
     trigger(hz, volumeDb = -12) {
-      synth.volume.value = volumeDb;
+      synth.volume.rampTo(volumeDb, 0.02); // an instant jump clicks if the last note is still ringing
       _voiceCount++;
       synth.triggerAttackRelease(hz, '4n'); // quarter-note hold lets decay complete
       setTimeout(() => { _voiceCount = Math.max(0, _voiceCount - 1); }, 700);
@@ -84,6 +84,7 @@ export function createCellVoice() {
 
 // Contact sting: the two notes that coincided, then the player chord as resolution
 export function resolutionCadence(contactNotes, playerChord) {
+  if (isRepeat('cadence', 100)) return;
   const poly = new Tone.PolySynth(Tone.Synth, {
     oscillator: { type: 'triangle' },
     envelope: { attack: 0.01, decay: 0.2, sustain: 0.15, release: 0.5 },
@@ -100,16 +101,49 @@ export function resolutionCadence(contactNotes, playerChord) {
   }, 2000);
 }
 
-// Master bus: compressor + brickwall limiter after the master volume stage.
-// Without this, overlapping voices sum past 0 dBFS at high tempo and hard-clip
+// Master bus after the master volume stage: limiter → soft clipper.
+// Without it, overlapping voices sum past 0 dBFS at high tempo and hard-clip
 // in the DAC — heard as harsh, tinny distortion (worst on the Pi's analog out).
+// The Web Audio compressor behind Tone.Limiter adds automatic makeup gain and is
+// not a brickwall (measured: +12 dB in → +0.9 dBFS out), so the soft clipper is
+// the real ceiling: transparent below -6 dBFS, then saturating smoothly towards
+// CLIP_CEILING so no sample can reach full scale.
+const CLIP_CEILING = 0.94; // ≈ -0.5 dBFS
+const CLIP_KNEE    = 0.5;  // -6 dBFS
+
+// A WaveShaper only reads input in [-1, 1], so a 0.5 pre-gain maps that range to
+// ±2 (+6 dBFS) of signal; anything hotter is held at the ceiling.
+function softClipCurve(n = 4096) {
+  const curve = new Float32Array(n + 1);
+  for (let i = 0; i <= n; i++) {
+    const x = (i / n) * 4 - 2;
+    const a = Math.abs(x);
+    const y = a <= CLIP_KNEE ? a
+      : CLIP_KNEE + (CLIP_CEILING - CLIP_KNEE) * Math.tanh((a - CLIP_KNEE) / (CLIP_CEILING - CLIP_KNEE));
+    curve[i] = Math.sign(x) * y;
+  }
+  return curve;
+}
+
 let _masterBusReady = false;
 export function initMasterBus() {
   if (_masterBusReady) return;
   _masterBusReady = true;
-  const comp    = new Tone.Compressor({ threshold: -18, ratio: 3, attack: 0.01, release: 0.2 });
-  const limiter = new Tone.Limiter(-3);
-  Tone.getDestination().chain(comp, limiter);
+  const limiter = new Tone.Limiter(-6);
+  const preGain = new Tone.Gain(0.5);
+  const clipper = new Tone.WaveShaper(softClipCurve());
+  clipper.oversample = '2x'; // keeps saturation harmonics from aliasing into a fizzy top end
+  Tone.getDestination().chain(limiter, preGain, clipper);
+}
+
+// The same one-shot fired several times in one instant (e.g. two proteins attaching
+// on one frame) sums in phase — N copies is N× the amplitude — so drop repeats.
+const _lastPlayed = new Map();
+function isRepeat(key, ms = 60) {
+  const t = performance.now();
+  if (t - (_lastPlayed.get(key) ?? -Infinity) < ms) return true;
+  _lastPlayed.set(key, t);
+  return false;
 }
 
 // Master volume tracks tempo: -18 dB at 60 BPM, reaches MASTER_PEAK_DB at 160 BPM and stays there.
@@ -123,6 +157,7 @@ export function setMasterVolume(bpm) {
 
 // Brief high dissonance ping when a complement protein attaches
 export function proteinAttachSound() {
+  if (isRepeat('proteinAttach')) return;
   const poly = new Tone.PolySynth(Tone.Synth, {
     oscillator: { type: 'sine' },
     envelope: { attack: 0.01, decay: 0.3, sustain: 0, release: 0.1 },
@@ -134,6 +169,7 @@ export function proteinAttachSound() {
 
 // Short ascending run when a protein is shaken off
 export function proteinDetachSound() {
+  if (isRepeat('proteinDetach')) return;
   const synth = new Tone.Synth({
     oscillator: { type: 'triangle' },
     envelope: { attack: 0.01, decay: 0.15, sustain: 0, release: 0.05 },
@@ -169,6 +205,7 @@ export function createCloneVoice() {
 
 // Short dissonant minor-second stab
 export function dissonantStab(noteA, noteB) {
+  if (isRepeat('stab')) return;
   const poly = new Tone.PolySynth(Tone.Synth, {
     oscillator: { type: 'sawtooth' },
     envelope: { attack: 0.005, decay: 0.12, sustain: 0.0, release: 0.05 },
@@ -185,6 +222,7 @@ export function dissonantStab(noteA, noteB) {
 
 // Alarming low growl when a macrophage latches onto the player
 export function playMacrophageAttach() {
+  if (isRepeat('macrophageAttach')) return;
   const synth = new Tone.Synth({
     oscillator: { type: 'sawtooth' },
     envelope: { attack: 0.02, decay: 0.6, sustain: 0.4, release: 1.0 },
@@ -196,6 +234,7 @@ export function playMacrophageAttach() {
 
 // Low thud when a macrophage consumes a clone
 export function playMacrophageConsume() {
+  if (isRepeat('macrophageConsume')) return;
   const synth = new Tone.MembraneSynth({
     pitchDecay: 0.06, octaves: 5,
     envelope: { attack: 0.001, decay: 0.35, sustain: 0, release: 0.1 },
@@ -207,6 +246,7 @@ export function playMacrophageConsume() {
 
 // Ascending shimmer when player chord mutates — distinct from resolution cadence
 export function playMutationSound() {
+  if (isRepeat('mutation', 100)) return;
   const poly = new Tone.PolySynth(Tone.Synth, {
     oscillator: { type: 'triangle' },
     envelope: { attack: 0.03, decay: 0.5, sustain: 0.3, release: 1.0 },
@@ -222,6 +262,7 @@ export function playMutationSound() {
 
 // Tritone stab when an antibody latches onto the player
 export function playAntibodyAttach() {
+  if (isRepeat('antibodyAttach')) return;
   const poly = new Tone.PolySynth(Tone.Synth, {
     oscillator: { type: 'sine' },
     envelope: { attack: 0.01, decay: 0.3, sustain: 0, release: 0.1 },
@@ -233,6 +274,7 @@ export function playAntibodyAttach() {
 
 // Escalating tick as neutrophil fuse counts down (beatNum 1–4)
 export function playNeutrophilTick(beatNum) {
+  if (isRepeat('neutrophilTick')) return;
   const synth = new Tone.Synth({
     oscillator: { type: 'square' },
     envelope: { attack: 0.001, decay: 0.08, sustain: 0, release: 0.04 },
@@ -244,6 +286,7 @@ export function playNeutrophilTick(beatNum) {
 
 // Burst of noise when neutrophil explodes
 export function playNeutrophilExplode() {
+  if (isRepeat('neutrophilExplode')) return;
   const noise = new Tone.NoiseSynth({
     noise: { type: 'white' },
     envelope: { attack: 0.001, decay: 0.18, sustain: 0, release: 0.08 },
